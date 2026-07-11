@@ -9,13 +9,14 @@ import {
   shiftWallsToPlot,
   shiftFurnitureToPlot,
 } from './apartments.js';
-import { FURNITURE_CATALOG } from './furniture.js';
+import { FURNITURE_CATALOG, CATALOG_CATEGORIES } from './furniture.js';
 import { SceneManager } from './scene.js';
+import { loadSave, writeSave, clearSave } from './storage.js';
 
 export class BytPlannerApp {
   constructor(rootEl) {
     this.root = rootEl;
-    this.currentApartment = '2+kk';
+    this.currentApartment = null;
     this.mode = 'preview';
     this.tool = 'select';
     this.walls = [];
@@ -23,11 +24,17 @@ export class BytPlannerApp {
     this.draggedFurniture = null;
     this.selectedFurniture = null;
     this.isDragging = false;
+    this.isPlacingDrag = false;
     this.placingType = null;
+    this.placingGridPos = null;
+    this.savedData = loadSave() || { apartments: {} };
+    this.saveTimer = null;
+    this.saveFlashTimer = null;
+    this.leftPanelCollapsed = this.savedData.ui?.leftPanelCollapsed ?? false;
 
     this.renderUI();
     this.initScene();
-    this.loadApartment('2+kk');
+    this.restoreSession();
     this.bindEvents();
   }
 
@@ -49,10 +56,23 @@ export class BytPlannerApp {
           </div>
         </header>
 
-        <aside class="side-panel" id="left-panel">
+        <div class="left-panel-shell" id="left-panel-shell">
+          <aside class="side-panel left" id="left-panel">
           <section class="panel-section">
             <h3>Typ bytu</h3>
             <div class="apartment-grid" id="apartment-btns"></div>
+          </section>
+
+          <section class="panel-section">
+            <h3>Uložení</h3>
+            <div class="save-row">
+              <button type="button" class="save-btn" id="save-btn">💾 Uložit</button>
+              <button type="button" class="save-btn danger" id="clear-save-btn">🗑️ Smazat uložení</button>
+            </div>
+            <div class="save-row">
+              <button type="button" class="save-btn secondary" id="reset-btn">↺ Reset bytu</button>
+            </div>
+            <p class="save-hint" id="save-hint">Ulož kliknutím na 💾 Uložit</p>
           </section>
 
           <section class="panel-section architect-only">
@@ -64,9 +84,9 @@ export class BytPlannerApp {
             </div>
           </section>
 
-          <section class="panel-section architect-only">
-            <h3>Nábytek — klikni pro umístění</h3>
-            <div class="furniture-list" id="furniture-list"></div>
+          <section class="panel-section architect-only catalog-section">
+            <h3>Katalog — vyber a táhni do plánu</h3>
+            <div class="catalog-categories" id="furniture-catalog"></div>
           </section>
 
           <section class="panel-section preview-only">
@@ -85,7 +105,17 @@ export class BytPlannerApp {
             Nástroj Zeď: klikni start → konec na mřížce (vodorovně/svisle).<br />
             Modrá čára = stávající byt. Mimo ni můžeš stavět dál.
           </div>
-        </aside>
+          </aside>
+          <button
+            type="button"
+            class="panel-edge-toggle"
+            id="left-panel-toggle"
+            aria-label="Sbalit levý panel"
+            title="Sbalit panel"
+          >
+            <span class="panel-edge-toggle-icon" aria-hidden="true">‹</span>
+          </button>
+        </div>
 
         <aside class="side-panel right">
           <section class="panel-section">
@@ -111,40 +141,178 @@ export class BytPlannerApp {
         <div class="status-bar" id="status-bar">
           <span class="mode-label preview">Náhled</span> · 2+kk · Táhni myší pro otáčení
         </div>
+
+        <div class="placement-banner hidden" id="placement-banner">
+          <span class="placement-banner-icon" id="placement-banner-icon">🚪</span>
+          <div>
+            <strong id="placement-banner-title">Táhni do plánu</strong>
+            <span id="placement-banner-text">Drž levé tlačítko, přesuň a pusť · <kbd>Esc</kbd> zruší</span>
+          </div>
+        </div>
       </div>
     `;
 
     this.canvasContainer = this.root.querySelector('#canvas-container');
     this.statusBar = this.root.querySelector('#status-bar');
+    this.placementBanner = this.root.querySelector('#placement-banner');
+    this.placementBannerIcon = this.root.querySelector('#placement-banner-icon');
+    this.placementBannerTitle = this.root.querySelector('#placement-banner-title');
+    this.placementBannerText = this.root.querySelector('#placement-banner-text');
+    this.architectHints = this.root.querySelector('#architect-hints');
+    this.saveHint = this.root.querySelector('#save-hint');
+    this.leftPanelShell = this.root.querySelector('#left-panel-shell');
+    this.leftPanelToggle = this.root.querySelector('#left-panel-toggle');
+    this.applyLeftPanelCollapsed(this.leftPanelCollapsed);
 
     const aptBtns = this.root.querySelector('#apartment-btns');
     for (const key of Object.keys(APARTMENT_TEMPLATES)) {
       const btn = document.createElement('button');
       btn.className = 'apartment-btn' + (key === '2+kk' ? ' active' : '');
       btn.dataset.apartment = key;
-      btn.textContent = key;
+      btn.textContent = APARTMENT_TEMPLATES[key].label;
       btn.title = APARTMENT_TEMPLATES[key].description;
       aptBtns.appendChild(btn);
     }
 
-    const furnList = this.root.querySelector('#furniture-list');
-    for (const [type, def] of Object.entries(FURNITURE_CATALOG)) {
-      const el = document.createElement('div');
-      el.className = 'furniture-item';
-      el.dataset.type = type;
-      el.innerHTML = `<div class="furniture-icon">${def.icon}</div><span>${def.label}</span>`;
-      furnList.appendChild(el);
-    }
+    this.renderCatalog();
 
     const wallColors = ['#f5f5f0', '#e8dcc8', '#d4e8f0', '#f0e8d4', '#e0d4f0', '#ffffff'];
     const floorColors = ['#c9b896', '#b8956a', '#8b7355', '#d4c4a8', '#a08060', '#e8dcc8'];
 
     this.renderColorSwatches('#wall-colors', wallColors, (c) => {
       this.scene.setWallColor(c);
+      this.scheduleSave();
     });
     this.renderColorSwatches('#floor-colors', floorColors, (c) => {
       this.scene.setFloorColor(c);
+      this.scheduleSave();
     }, 0);
+  }
+
+  restoreSession() {
+    const initialApt = this.savedData.currentApartment || '2+kk';
+    this.loadApartment(initialApt);
+
+    if (this.savedData.wallColor) {
+      this.scene.setWallColor(this.savedData.wallColor);
+      this.setColorSwatchActive('#wall-colors', this.savedData.wallColor);
+    }
+    if (this.savedData.floorColor) {
+      this.scene.setFloorColor(this.savedData.floorColor);
+      this.setColorSwatchActive('#floor-colors', this.savedData.floorColor);
+    }
+    if (this.savedData.mode && this.savedData.mode !== this.mode) {
+      this.setMode(this.savedData.mode);
+    }
+    this.updateSaveHintDefault();
+  }
+
+  setColorSwatchActive(selector, color) {
+    const container = this.root.querySelector(selector);
+    if (!container) return;
+    container.querySelectorAll('.color-swatch').forEach((swatch) => {
+      swatch.classList.toggle('active', swatch.dataset.color === color);
+    });
+  }
+
+  persistCurrentApartment() {
+    if (!this.currentApartment) return;
+
+    if (!this.savedData.apartments) this.savedData.apartments = {};
+    this.savedData.apartments[this.currentApartment] = {
+      walls: cloneWalls(this.walls),
+      furniture: this.scene.getFurnitureState(),
+    };
+  }
+
+  saveNow({ auto = false, quiet = false } = {}) {
+    this.persistCurrentApartment();
+    this.savedData.currentApartment = this.currentApartment;
+    this.savedData.mode = this.mode;
+    this.savedData.wallColor = this.scene.wallColor;
+    this.savedData.floorColor = this.scene.floorColor;
+    if (!this.savedData.ui) this.savedData.ui = {};
+    this.savedData.ui.leftPanelCollapsed = this.leftPanelCollapsed;
+
+    const ok = writeSave(this.savedData);
+    if (!quiet) {
+      if (ok) {
+        this.flashSaveHint(auto ? 'Automaticky uloženo ✓' : 'Uloženo ✓', 'success');
+      } else {
+        this.flashSaveHint('Uložení selhalo', 'error');
+      }
+    }
+    return ok;
+  }
+
+  scheduleSave() {
+    if (this.mode !== 'architect') return;
+
+    clearTimeout(this.saveTimer);
+    this.saveTimer = setTimeout(() => this.saveNow({ auto: true }), 500);
+    this.flashSaveHint('Ukládám…', 'pending');
+  }
+
+  flashSaveHint(text, kind = 'success') {
+    if (!this.saveHint) return;
+    this.saveHint.textContent = text;
+    this.saveHint.dataset.state = kind;
+
+    clearTimeout(this.saveFlashTimer);
+    if (kind === 'success' || kind === 'error') {
+      this.saveFlashTimer = setTimeout(() => this.updateSaveHintDefault(), 2500);
+    }
+  }
+
+  updateSaveHintDefault() {
+    if (!this.saveHint) return;
+    this.saveHint.textContent =
+      this.mode === 'architect'
+        ? 'V režimu architekta se ukládá automaticky · nebo 💾 Uložit'
+        : 'Ulož kliknutím na 💾 Uložit';
+    this.saveHint.dataset.state = '';
+  }
+
+  applyLeftPanelCollapsed(collapsed) {
+    if (!this.leftPanelShell) return;
+    this.leftPanelCollapsed = collapsed;
+    this.leftPanelShell.classList.toggle('collapsed', collapsed);
+    if (this.leftPanelToggle) {
+      const label = collapsed ? 'Rozbalit levý panel' : 'Sbalit levý panel';
+      this.leftPanelToggle.setAttribute('aria-label', label);
+      this.leftPanelToggle.title = collapsed ? 'Rozbalit panel' : 'Sbalit panel';
+    }
+  }
+
+  toggleLeftPanel() {
+    this.applyLeftPanelCollapsed(!this.leftPanelCollapsed);
+  }
+
+  clearAllSave() {
+    if (
+      !confirm(
+        'Smazat veškeré uložené plány ze prohlížeče? Všechny byty se vrátí na výchozí stav.'
+      )
+    ) {
+      return;
+    }
+
+    clearSave();
+    this.savedData = { apartments: {} };
+    const apt = this.currentApartment || '2+kk';
+    this.loadApartment(apt, { forceTemplate: true });
+    this.flashSaveHint('Uložení smazáno', 'success');
+  }
+
+  resetCurrentApartment() {
+    if (!this.currentApartment) return;
+    if (!confirm(`Opravdu resetovat „${this.getApartmentLabel()}“ na výchozí stav?`)) return;
+
+    if (this.savedData.apartments) {
+      delete this.savedData.apartments[this.currentApartment];
+    }
+    this.loadApartment(this.currentApartment, { forceTemplate: true });
+    this.flashSaveHint('Byt resetován · ulož kliknutím na 💾', 'success');
   }
 
   renderColorSwatches(selector, colors, onPick, activeIdx = 0) {
@@ -163,26 +331,86 @@ export class BytPlannerApp {
     });
   }
 
+  renderCatalog() {
+    const container = this.root.querySelector('#furniture-catalog');
+
+    for (const category of CATALOG_CATEGORIES) {
+      const details = document.createElement('details');
+      details.className = 'catalog-category';
+      details.open = category.id === 'structural' || category.id === 'living';
+
+      const summary = document.createElement('summary');
+      summary.className = 'catalog-category-title';
+      summary.innerHTML = `<span class="catalog-category-icon">${category.icon}</span> ${category.label}`;
+      details.appendChild(summary);
+
+      const list = document.createElement('div');
+      list.className = 'furniture-list';
+
+      for (const type of category.items) {
+        const def = FURNITURE_CATALOG[type];
+        if (!def) continue;
+
+        const el = document.createElement('div');
+        el.className = 'furniture-item';
+        el.dataset.type = type;
+        el.title = def.label;
+        el.innerHTML = `<div class="furniture-icon">${def.icon}</div><span>${def.label}</span>`;
+        list.appendChild(el);
+      }
+
+      details.appendChild(list);
+      container.appendChild(details);
+    }
+  }
+
   initScene() {
     this.scene = new SceneManager(this.canvasContainer);
   }
 
-  loadApartment(key) {
+  getApartmentLabel(key = this.currentApartment) {
+    return APARTMENT_TEMPLATES[key]?.label ?? key ?? '';
+  }
+
+  loadApartment(key, { forceTemplate = false } = {}) {
     const tpl = APARTMENT_TEMPLATES[key];
     if (!tpl) return;
 
+    if (this.currentApartment && this.currentApartment !== key) {
+      this.persistCurrentApartment();
+    }
+
     this.currentApartment = key;
     this.wallStart = null;
+    this.cancelPlacing();
+    this.clearSelection();
 
     const layout = getPlotLayout(tpl.floorSize);
     this.plotLayout = layout;
-    this.walls = shiftWallsToPlot(cloneWalls(tpl.walls), layout.offset);
 
-    this.scene.setPlotSize(layout.plotSize, layout.apartmentBounds);
-    this.scene.setWalls(this.walls);
-    this.scene.loadDefaultFurniture(
-      shiftFurnitureToPlot(tpl.defaultFurniture, layout.offset)
+    const saved = !forceTemplate ? this.savedData.apartments?.[key] : null;
+
+    this.scene.setPlotSize(
+      layout.plotSize,
+      tpl.empty ? null : layout.apartmentBounds
     );
+
+    if (saved?.walls?.length) {
+      this.walls = cloneWalls(saved.walls);
+      this.scene.setWalls(this.walls);
+    } else {
+      this.walls = shiftWallsToPlot(cloneWalls(tpl.walls), layout.offset);
+      this.scene.setWalls(this.walls);
+    }
+
+    if (saved?.furniture?.length) {
+      this.scene.loadFurnitureFromState(saved.furniture);
+    } else {
+      this.scene.loadDefaultFurniture(
+        shiftFurnitureToPlot(tpl.defaultFurniture, layout.offset)
+      );
+    }
+
     this.scene.setMode(this.mode);
     this.scene.setCameraView('iso');
 
@@ -191,12 +419,13 @@ export class BytPlannerApp {
     });
 
     this.updateStatus();
+    this.scheduleSave();
   }
 
   setMode(mode) {
     this.mode = mode;
     this.tool = 'select';
-    this.placingType = null;
+    this.cancelPlacing();
     this.wallStart = null;
     this.clearSelection();
 
@@ -218,11 +447,12 @@ export class BytPlannerApp {
     this.scene.setMode(mode);
     this.scene.controls.enabled = true;
     this.updateStatus();
+    this.updateSaveHintDefault();
   }
 
   setTool(tool) {
     this.tool = tool;
-    this.placingType = null;
+    this.cancelPlacing();
     this.wallStart = null;
 
     this.root.querySelectorAll('.tool-btn').forEach((btn) => {
@@ -235,22 +465,62 @@ export class BytPlannerApp {
     const modeLabel = this.mode === 'architect' ? 'Architekt' : 'Náhled';
     const modeClass = this.mode;
     let extra = '';
+    let statusHint = 'Táhni myší pro otáčení';
 
     if (this.mode === 'architect') {
       if (this.placingType) {
-        extra = ` · Umisťuješ: ${FURNITURE_CATALOG[this.placingType].label}`;
+        const label = FURNITURE_CATALOG[this.placingType].label;
+        extra = ` · Umisťuješ: ${label}`;
+        statusHint = '→ Drž levé tlačítko, táhni a pusť';
       } else if (this.tool === 'wall') {
         extra = this.wallStart ? ' · Klikni konec zdi' : ' · Klikni začátek zdi';
+        statusHint = this.wallStart ? '→ Druhý klik ukončí zeď' : '→ První klik = začátek zdi';
       } else if (this.tool === 'eraser') {
         extra = ' · Klikni na zeď ke smazání';
+        statusHint = '→ Klikni na zeď, kterou chceš smazat';
       }
     }
 
     this.statusBar.innerHTML = `
       <span class="mode-label ${modeClass}">${modeLabel}</span>
-      · ${this.currentApartment}${extra}
-      · Táhni myší pro otáčení
+      · ${this.getApartmentLabel()}${extra}
+      · ${statusHint}
     `;
+
+    this.updatePlacementUI();
+  }
+
+  updatePlacementUI() {
+    const isPlacing = this.mode === 'architect' && this.placingType;
+    const def = isPlacing ? FURNITURE_CATALOG[this.placingType] : null;
+    const isDragging = this.isPlacingDrag;
+
+    this.placementBanner.classList.toggle('hidden', !isPlacing || isDragging);
+    this.canvasContainer.classList.toggle('placing-mode', isPlacing);
+    this.canvasContainer.classList.toggle('placing-drag', isDragging);
+
+    if (isPlacing && def) {
+      this.placementBannerIcon.textContent = def.icon;
+      this.placementBannerTitle.textContent =
+        isDragging ? `Pusť tlačítko — ${def.label}` : `Táhni do plánu — ${def.label}`;
+      this.placementBannerText.innerHTML =
+        'Drž levé tlačítko na podlaze, přesuň a pusť · <kbd>R</kbd> otočí po umístění · <kbd>Esc</kbd> zruší';
+      this.architectHints.innerHTML = `
+        <strong>Právě umisťuješ: ${def.label}</strong>
+        1. Na podlaze v plánu <strong>drž levé tlačítko</strong> myši.<br />
+        2. Táhni tam, kam to patří — uvidíš oranžový náhled.<br />
+        3. <strong>Pusť tlačítko</strong> — položka se umístí.<br />
+        Pak <kbd>R</kbd> otočí · <kbd>Esc</kbd> zruší
+      `;
+    } else {
+      this.architectHints.innerHTML = `
+        <strong>Režim architekta</strong>
+        V katalogu vyber položku → na podlaze drž a táhni myší.<br />
+        Vybraný nábytek táhni myší. <kbd>R</kbd> otočí. <kbd>Del</kbd> smaže.<br />
+        Nástroj Zeď: klikni start → konec na mřížce (vodorovně/svisle).<br />
+        Modrá čára = stávající byt. Mimo ni můžeš stavět dál.
+      `;
+    }
   }
 
   bindEvents() {
@@ -273,20 +543,85 @@ export class BytPlannerApp {
     this.root.querySelectorAll('.furniture-item').forEach((el) => {
       el.addEventListener('click', () => {
         if (this.mode !== 'architect') return;
-        this.placingType = el.dataset.type;
-        this.setTool('select');
-        this.updateStatus();
+        this.startPlacing(el.dataset.type, el);
       });
     });
 
-    const canvas = () => this.scene.renderer.domElement;
+    const canvasEl = () => this.scene.renderer.domElement;
 
-    canvas().addEventListener('pointerdown', (e) => this.onPointerDown(e));
-    canvas().addEventListener('pointermove', (e) => this.onPointerMove(e));
-    canvas().addEventListener('pointerup', (e) => this.onPointerUp(e));
-    canvas().addEventListener('contextmenu', (e) => e.preventDefault());
+    canvasEl().addEventListener('pointerdown', (e) => this.onPointerDown(e));
+    canvasEl().addEventListener('pointermove', (e) => this.onPointerMove(e));
+    canvasEl().addEventListener('pointerup', (e) => this.onPointerUp(e));
+    canvasEl().addEventListener('pointercancel', (e) => this.onPointerUp(e));
+    canvasEl().addEventListener('pointerleave', (e) => {
+      if (!this.isPlacingDrag) this.scene.hidePlacementGhost();
+    });
+    canvasEl().addEventListener('contextmenu', (e) => e.preventDefault());
 
     window.addEventListener('keydown', (e) => this.onKeyDown(e));
+
+    this.root.querySelector('#save-btn')?.addEventListener('click', () => this.saveNow());
+    this.root.querySelector('#clear-save-btn')?.addEventListener('click', () => this.clearAllSave());
+    this.root.querySelector('#reset-btn')?.addEventListener('click', () => this.resetCurrentApartment());
+    this.leftPanelToggle?.addEventListener('click', () => this.toggleLeftPanel());
+
+    window.addEventListener('beforeunload', () => {
+      if (this.mode === 'architect') this.saveNow({ auto: true, quiet: true });
+    });
+  }
+
+  startPlacing(type, catalogEl = null) {
+    this.tool = 'select';
+    this.wallStart = null;
+    this.placingType = type;
+    this.placingGridPos = null;
+    this.isPlacingDrag = false;
+    this.scene.setPlacementGhost(type);
+
+    this.root.querySelectorAll('.furniture-item').forEach((item) => {
+      item.classList.toggle('placing', catalogEl ? item === catalogEl : item.dataset.type === type);
+    });
+    this.root.querySelectorAll('.tool-btn').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.tool === 'select');
+    });
+    this.updateStatus();
+  }
+
+  cancelPlacing() {
+    this.placingType = null;
+    this.placingGridPos = null;
+    this.isPlacingDrag = false;
+    this.scene.clearPlacementGhost();
+    this.root.querySelectorAll('.furniture-item').forEach((item) => {
+      item.classList.remove('placing');
+    });
+    this.scene.controls.enabled = true;
+    this.canvasContainer?.classList.remove('placing-drag');
+  }
+
+  updatePlacingGhostFromEvent(e) {
+    if (!this.placingType) return;
+
+    const grid = this.scene.getGroundGridPosition(e.clientX, e.clientY);
+    if (!grid) {
+      if (!this.isPlacingDrag) this.scene.hidePlacementGhost();
+      return;
+    }
+
+    this.placingGridPos = grid;
+    this.scene.updatePlacementGhost(grid.x, grid.z);
+  }
+
+  commitPlacement() {
+    if (!this.placingType || !this.placingGridPos) return;
+
+    const { x, z } = this.placingGridPos;
+    const type = this.placingType;
+    const furn = this.scene.addFurniture(type, x, z);
+    if (furn) this.selectFurniture(furn);
+    this.cancelPlacing();
+    this.updateStatus();
+    this.scheduleSave();
   }
 
   onPointerDown(e) {
@@ -296,7 +631,11 @@ export class BytPlannerApp {
 
     if (this.mode === 'architect') {
       if (this.placingType) {
-        this.placeFurnitureAt(hit, e);
+        this.isPlacingDrag = true;
+        this.scene.controls.enabled = false;
+        e.target.setPointerCapture(e.pointerId);
+        this.updatePlacingGhostFromEvent(e);
+        this.updatePlacementUI();
         return;
       }
 
@@ -320,6 +659,10 @@ export class BytPlannerApp {
   }
 
   onPointerMove(e) {
+    if (this.placingType) {
+      this.updatePlacingGhostFromEvent(e);
+    }
+
     if (!this.isDragging || !this.selectedFurniture) return;
 
     const hit = this.scene.raycast(e.clientX, e.clientY, {
@@ -338,11 +681,28 @@ export class BytPlannerApp {
 
   onPointerUp(e) {
     if (e.button !== 0) return;
+
+    if (this.isPlacingDrag) {
+      this.isPlacingDrag = false;
+      e.target.releasePointerCapture?.(e.pointerId);
+      this.scene.controls.enabled = true;
+      if (this.placingGridPos) {
+        this.commitPlacement();
+      } else {
+        this.updatePlacementUI();
+      }
+      return;
+    }
+
+    if (this.isDragging) {
+      this.scheduleSave();
+    }
+
     this.isDragging = false;
     this.scene.controls.enabled = true;
   }
 
-  placeFurnitureAt(hit, e) {
+  placeFurnitureAt(hit) {
     let x, z;
     if (hit?.point) {
       const snapped = this.scene.snapToGrid(hit.point.x, hit.point.z);
@@ -356,7 +716,7 @@ export class BytPlannerApp {
 
     const furn = this.scene.addFurniture(this.placingType, x, z);
     if (furn) this.selectFurniture(furn);
-    this.placingType = null;
+    this.cancelPlacing();
     this.updateStatus();
   }
 
@@ -398,12 +758,14 @@ export class BytPlannerApp {
 
     this.wallStart = null;
     this.updateStatus();
+    this.scheduleSave();
   }
 
   removeWall(segment) {
     const key = wallKey(segment);
     this.walls = this.walls.filter((w) => wallKey(w) !== key);
     this.scene.setWalls(this.walls);
+    this.scheduleSave();
   }
 
   selectFurniture(obj) {
@@ -447,11 +809,13 @@ export class BytPlannerApp {
     this.scene.furnitureGroup.remove(this.selectedFurniture);
     this.selectedFurniture = null;
     this.updateStatus();
+    this.scheduleSave();
   }
 
   rotateSelected() {
     if (!this.selectedFurniture || this.mode !== 'architect') return;
     this.selectedFurniture.rotation.y += Math.PI / 2;
+    this.scheduleSave();
   }
 
   onKeyDown(e) {
@@ -462,7 +826,7 @@ export class BytPlannerApp {
       this.rotateSelected();
     }
     if (e.key === 'Escape') {
-      this.placingType = null;
+      this.cancelPlacing();
       this.wallStart = null;
       this.clearSelection();
       this.updateStatus();

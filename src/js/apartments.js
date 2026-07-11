@@ -166,6 +166,16 @@ export const APARTMENT_TEMPLATES = {
       kitchen: '#f5e6d3',
     },
   },
+
+  prazdny: {
+    label: 'Prázdný plán',
+    description: 'Prázdná plocha — bez zdí a nábytku, kresli od nuly',
+    floorSize: { width: 16, depth: 14 },
+    walls: [],
+    defaultFurniture: [],
+    empty: true,
+    roomColors: {},
+  },
 };
 
 export function wallKey(w) {

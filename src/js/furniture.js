@@ -1,41 +1,45 @@
 import * as THREE from 'three';
 
-/** Katalog nábytku — rozměry v metrech, barvy pro preview režim */
-export const FURNITURE_CATALOG = {
+/** Definice všech položek — rozměry v metrech */
+const FURNITURE_ITEMS = {
+  door: {
+    label: 'Dveře',
+    icon: '🚪',
+    size: { w: 0.9, h: 2.1, d: 0.12 },
+    color: '#c87832',
+    accent: '#4a3728',
+    structural: true,
+  },
+  window: {
+    label: 'Okno',
+    icon: '🪟',
+    size: { w: 1.2, h: 1.4, d: 0.1 },
+    color: '#ffffff',
+    accent: '#dde4ea',
+    sillHeight: 0.9,
+    structural: true,
+  },
+  balcony_door: {
+    label: 'Balkónové dveře',
+    icon: '🏠',
+    size: { w: 1.8, h: 2.1, d: 0.12 },
+    color: '#eef2f6',
+    accent: '#1b9e77',
+    structural: true,
+  },
+  radiator: {
+    label: 'Radiátor',
+    icon: '🔥',
+    size: { w: 0.8, h: 0.6, d: 0.08 },
+    color: '#e8e8e8',
+    accent: '#cccccc',
+  },
   sofa: {
     label: 'Pohovka',
     icon: '🛋️',
     size: { w: 2.0, h: 0.85, d: 0.9 },
     color: '#6b5344',
     accent: '#8b7355',
-  },
-  bed: {
-    label: 'Postel',
-    icon: '🛏️',
-    size: { w: 1.6, h: 0.5, d: 2.0 },
-    color: '#e8e0d4',
-    accent: '#c4b8a8',
-  },
-  table: {
-    label: 'Stůl',
-    icon: '🪑',
-    size: { w: 1.2, h: 0.75, d: 0.8 },
-    color: '#8b6914',
-    accent: '#a07818',
-  },
-  chair: {
-    label: 'Židle',
-    icon: '💺',
-    size: { w: 0.45, h: 0.9, d: 0.45 },
-    color: '#4a5568',
-    accent: '#718096',
-  },
-  wardrobe: {
-    label: 'Skříň',
-    icon: '🚪',
-    size: { w: 1.2, h: 2.2, d: 0.6 },
-    color: '#5c4033',
-    accent: '#7a5544',
   },
   tv: {
     label: 'Televize',
@@ -44,19 +48,12 @@ export const FURNITURE_CATALOG = {
     color: '#1a1a2e',
     accent: '#2d2d44',
   },
-  kitchen: {
-    label: 'Kuchyňská linka',
-    icon: '🍳',
-    size: { w: 2.0, h: 0.9, d: 0.6 },
-    color: '#f0f0f0',
-    accent: '#d0d0d0',
-  },
-  desk: {
-    label: 'Psací stůl',
-    icon: '🖥️',
-    size: { w: 1.4, h: 0.75, d: 0.7 },
-    color: '#654321',
-    accent: '#8b5a2b',
+  table: {
+    label: 'Konferenční stůl',
+    icon: '☕',
+    size: { w: 1.2, h: 0.45, d: 0.8 },
+    color: '#8b6914',
+    accent: '#a07818',
   },
   bookshelf: {
     label: 'Knihovna',
@@ -72,12 +69,132 @@ export const FURNITURE_CATALOG = {
     color: '#2d5016',
     accent: '#4a7c23',
   },
+  lamp: {
+    label: 'Lampa',
+    icon: '💡',
+    size: { w: 0.35, h: 1.55, d: 0.35 },
+    color: '#f5e6c8',
+    accent: '#d4a843',
+  },
+  bed: {
+    label: 'Postel',
+    icon: '🛏️',
+    size: { w: 1.6, h: 0.5, d: 2.0 },
+    color: '#e8e0d4',
+    accent: '#c4b8a8',
+  },
+  wardrobe: {
+    label: 'Skříň',
+    icon: '🗄️',
+    size: { w: 1.2, h: 2.2, d: 0.6 },
+    color: '#5c4033',
+    accent: '#7a5544',
+  },
+  nightstand: {
+    label: 'Noční stolek',
+    icon: '🛎️',
+    size: { w: 0.45, h: 0.55, d: 0.4 },
+    color: '#654321',
+    accent: '#8b5a2b',
+  },
+  kitchen: {
+    label: 'Kuchyňská linka',
+    icon: '🍳',
+    size: { w: 2.0, h: 0.9, d: 0.6 },
+    color: '#f0f0f0',
+    accent: '#d0d0d0',
+  },
+  dining_table: {
+    label: 'Jídelní stůl',
+    icon: '🍽️',
+    size: { w: 1.6, h: 0.75, d: 0.9 },
+    color: '#8b6914',
+    accent: '#a07818',
+  },
+  chair: {
+    label: 'Židle',
+    icon: '💺',
+    size: { w: 0.45, h: 0.9, d: 0.45 },
+    color: '#4a5568',
+    accent: '#718096',
+  },
+  desk: {
+    label: 'Psací stůl',
+    icon: '🖥️',
+    size: { w: 1.4, h: 0.75, d: 0.7 },
+    color: '#654321',
+    accent: '#8b5a2b',
+  },
+  toilet: {
+    label: 'WC',
+    icon: '🚽',
+    size: { w: 0.4, h: 0.75, d: 0.65 },
+    color: '#f5f5f5',
+    accent: '#e0e0e0',
+  },
+  sink: {
+    label: 'Umyvadlo',
+    icon: '🚰',
+    size: { w: 0.65, h: 0.85, d: 0.45 },
+    color: '#f5f5f5',
+    accent: '#c0c0c0',
+  },
+  bathtub: {
+    label: 'Vana',
+    icon: '🛁',
+    size: { w: 1.7, h: 0.55, d: 0.75 },
+    color: '#f5f5f5',
+    accent: '#e8e8e8',
+  },
 };
+
+/** Kategorie pro levý panel — pořadí a seskupení položek */
+export const CATALOG_CATEGORIES = [
+  {
+    id: 'structural',
+    label: 'Stavební prvky',
+    icon: '🏗️',
+    items: ['door', 'window', 'balcony_door', 'radiator'],
+  },
+  {
+    id: 'living',
+    label: 'Obývací pokoj',
+    icon: '🛋️',
+    items: ['sofa', 'tv', 'table', 'bookshelf', 'plant', 'lamp'],
+  },
+  {
+    id: 'bedroom',
+    label: 'Ložnice',
+    icon: '🛏️',
+    items: ['bed', 'wardrobe', 'nightstand', 'lamp'],
+  },
+  {
+    id: 'kitchen',
+    label: 'Kuchyně & jídelna',
+    icon: '🍳',
+    items: ['kitchen', 'dining_table', 'chair'],
+  },
+  {
+    id: 'office',
+    label: 'Pracovna',
+    icon: '🖥️',
+    items: ['desk', 'chair', 'bookshelf'],
+  },
+  {
+    id: 'bathroom',
+    label: 'Koupelna',
+    icon: '🛁',
+    items: ['toilet', 'sink', 'bathtub', 'radiator'],
+  },
+];
+
+/** Plochý katalog pro zpětnou kompatibilitu */
+export const FURNITURE_CATALOG = { ...FURNITURE_ITEMS };
 
 let furnitureIdCounter = 0;
 
 export function createFurnitureMesh(type, mode = 'preview') {
-  const def = FURNITURE_CATALOG[type];
+  const def = FURNITURE_ITEMS[type];
   if (!def) return null;
 
   const group = new THREE.Group();
@@ -91,73 +208,253 @@ export function createFurnitureMesh(type, mode = 'preview') {
   const { w, h, d } = def.size;
   const isArchitect = mode === 'architect';
 
-  if (type === 'sofa') {
-    addBox(group, w, h * 0.5, d, 0, h * 0.25, 0, def.color, isArchitect);
-    addBox(group, w, h * 0.35, d * 0.15, 0, h * 0.575, -d * 0.425, def.accent, isArchitect);
-    addBox(group, w * 0.12, h * 0.25, d, -w * 0.44, h * 0.375, 0, def.accent, isArchitect);
-    addBox(group, w * 0.12, h * 0.25, d, w * 0.44, h * 0.375, 0, def.accent, isArchitect);
-  } else if (type === 'bed') {
-    addBox(group, w, h * 0.4, d, 0, h * 0.2, 0, def.color, isArchitect);
-    addBox(group, w, h * 0.15, d * 0.08, 0, h * 0.475, -d * 0.46, def.accent, isArchitect);
-    addBox(group, w * 0.9, h * 0.12, d * 0.85, 0, h * 0.46, 0, '#ffffff', isArchitect);
-  } else if (type === 'chair') {
-    addBox(group, w, h * 0.05, d, 0, h * 0.45, 0, def.color, isArchitect);
-    addBox(group, w, h * 0.5, d * 0.08, 0, h * 0.75, -d * 0.46, def.accent, isArchitect);
-    addLegs(group, w, d, h * 0.45, def.accent, isArchitect);
-  } else if (type === 'tv') {
-    addBox(group, w, h, d, 0, h * 0.5 + 0.5, 0, def.color, isArchitect);
-    addBox(group, w * 0.6, 0.05, d * 2, 0, 0.5, 0, '#333', isArchitect);
-  } else if (type === 'plant') {
-    addCylinder(group, w * 0.35, h * 0.25, def.accent, isArchitect);
-    addSphere(group, w * 0.5, h * 0.55, def.color, isArchitect);
-  } else if (type === 'kitchen') {
-    addBox(group, w, h, d, 0, h * 0.5, 0, def.color, isArchitect);
-    addBox(group, w * 0.95, h * 0.05, d * 0.9, 0, h + 0.025, 0, def.accent, isArchitect);
-  } else {
-    addBox(group, w, h, d, 0, h * 0.5, 0, def.color, isArchitect);
+  switch (type) {
+    case 'door':
+      buildDoor(group, w, h, d, def, isArchitect);
+      break;
+    case 'window':
+      buildWindow(group, w, h, d, def, isArchitect);
+      break;
+    case 'balcony_door':
+      buildBalconyDoor(group, w, h, d, def, isArchitect);
+      break;
+    case 'radiator':
+      buildRadiator(group, w, h, d, def, isArchitect);
+      break;
+    case 'sofa':
+      addBox(group, w, h * 0.5, d, 0, h * 0.25, 0, def.color, isArchitect);
+      addBox(group, w, h * 0.35, d * 0.15, 0, h * 0.575, -d * 0.425, def.accent, isArchitect);
+      addBox(group, w * 0.12, h * 0.25, d, -w * 0.44, h * 0.375, 0, def.accent, isArchitect);
+      addBox(group, w * 0.12, h * 0.25, d, w * 0.44, h * 0.375, 0, def.accent, isArchitect);
+      break;
+    case 'bed':
+      addBox(group, w, h * 0.4, d, 0, h * 0.2, 0, def.color, isArchitect);
+      addBox(group, w, h * 0.15, d * 0.08, 0, h * 0.475, -d * 0.46, def.accent, isArchitect);
+      addBox(group, w * 0.9, h * 0.12, d * 0.85, 0, h * 0.46, 0, '#ffffff', isArchitect);
+      break;
+    case 'chair':
+      addBox(group, w, h * 0.05, d, 0, h * 0.45, 0, def.color, isArchitect);
+      addBox(group, w, h * 0.5, d * 0.08, 0, h * 0.75, -d * 0.46, def.accent, isArchitect);
+      addLegs(group, w, d, h * 0.45, def.accent, isArchitect);
+      break;
+    case 'tv':
+      addBox(group, w, h, d, 0, h * 0.5 + 0.5, 0, def.color, isArchitect);
+      addBox(group, w * 0.6, 0.05, d * 2, 0, 0.5, 0, '#333333', isArchitect);
+      break;
+    case 'plant':
+      addCylinder(group, w * 0.35, h * 0.25, def.accent, isArchitect);
+      addSphere(group, w * 0.5, h * 0.55, def.color, isArchitect);
+      break;
+    case 'kitchen':
+      addBox(group, w, h, d, 0, h * 0.5, 0, def.color, isArchitect);
+      addBox(group, w * 0.95, h * 0.05, d * 0.9, 0, h + 0.025, 0, def.accent, isArchitect);
+      break;
+    case 'lamp':
+      buildLamp(group, w, h, def, isArchitect);
+      break;
+    case 'nightstand':
+      addBox(group, w, h * 0.85, d, 0, h * 0.425, 0, def.color, isArchitect);
+      addBox(group, w * 0.9, h * 0.08, d * 0.85, 0, h * 0.89, 0, def.accent, isArchitect);
+      addLegs(group, w * 0.85, d * 0.85, h * 0.4, def.accent, isArchitect);
+      break;
+    case 'dining_table':
+      addBox(group, w, h * 0.06, d, 0, h * 0.97, 0, def.color, isArchitect);
+      addLegs(group, w * 0.85, d * 0.85, h * 0.94, def.accent, isArchitect);
+      break;
+    case 'toilet':
+      buildToilet(group, w, h, d, def, isArchitect);
+      break;
+    case 'sink':
+      buildSink(group, w, h, d, def, isArchitect);
+      break;
+    case 'bathtub':
+      buildBathtub(group, w, h, d, def, isArchitect);
+      break;
+    default:
+      addBox(group, w, h, d, 0, h * 0.5, 0, def.color, isArchitect);
+      break;
   }
 
   return group;
 }
 
-function makeMaterial(color, architect) {
-  if (architect) {
-    return new THREE.MeshLambertMaterial({
-      color: 0x8899aa,
-      transparent: true,
-      opacity: 0.85,
-    });
-  }
-  return new THREE.MeshStandardMaterial({
-    color,
-    roughness: 0.65,
-    metalness: 0.05,
+function buildDoor(group, w, h, d, def, architect) {
+  const frame = 0.07;
+  const leafW = w - frame * 2;
+  const leafH = h - frame * 2;
+
+  addBox(group, w + 0.04, h + 0.04, d * 0.45, 0, h * 0.5, 0, def.accent, architect, {
+    keepColor: true,
+    emissive: '#2a1810',
+  });
+  addBox(group, leafW, leafH, d * 0.55, 0, h * 0.5, d * 0.18, def.color, architect, {
+    keepColor: true,
+    emissive: '#6b3a12',
+  });
+  addBox(group, leafW * 0.12, leafH * 0.55, 0.025, -leafW * 0.08, h * 0.52, d * 0.42, '#5a3820', architect, {
+    keepColor: true,
+  });
+  addBox(group, 0.05, 0.14, 0.06, w * 0.38, h * 0.52, d * 0.38, '#e6b422', architect, {
+    keepColor: true,
+    emissive: '#806010',
   });
 }
 
-function addBox(parent, w, h, d, x, y, z, color, architect) {
+function buildWindow(group, w, h, d, def, architect) {
+  const sill = def.sillHeight ?? 0.9;
+  const cy = sill + h * 0.5;
+  const frame = 0.07;
+  const glassW = w - frame * 2;
+  const glassH = h - frame * 2;
+
+  addBox(group, w + 0.06, h + frame * 2, d * 0.55, 0, cy, 0, def.color, architect, {
+    keepColor: true,
+    emissive: '#888888',
+  });
+  addBox(group, glassW, glassH, d * 0.25, 0, cy, d * 0.22, '#7ec8ff', architect, {
+    keepColor: true,
+    isGlass: true,
+  });
+  addBox(group, 0.05, glassH, d * 0.28, 0, cy, d * 0.24, def.color, architect, { keepColor: true });
+  addBox(group, glassW, 0.05, d * 0.28, 0, cy, d * 0.24, def.color, architect, { keepColor: true });
+  addBox(group, w + 0.08, 0.08, d * 0.6, 0, sill + 0.04, d * 0.12, def.accent, architect, {
+    keepColor: true,
+  });
+}
+
+function buildBalconyDoor(group, w, h, d, def, architect) {
+  const frame = 0.07;
+  const innerH = h - frame * 2;
+  const panelW = (w - frame * 3) / 2;
+
+  addBox(group, w + 0.04, h + 0.04, d * 0.45, 0, h * 0.5, 0, def.accent, architect, {
+    keepColor: true,
+    emissive: '#0d4a35',
+  });
+  addBox(group, panelW, innerH, d * 0.5, -panelW * 0.5 - frame * 0.5, h * 0.5, d * 0.2, def.color, architect, {
+    keepColor: true,
+    emissive: '#334455',
+  });
+  addBox(group, panelW, innerH, d * 0.5, panelW * 0.5 + frame * 0.5, h * 0.5, d * 0.2, def.color, architect, {
+    keepColor: true,
+    emissive: '#334455',
+  });
+  addBox(group, panelW * 0.75, innerH * 0.58, d * 0.22, panelW * 0.5 + frame * 0.5, h * 0.62, d * 0.28, '#7ec8ff', architect, {
+    keepColor: true,
+    isGlass: true,
+  });
+  addBox(group, 0.05, innerH, d * 0.28, 0, h * 0.5, d * 0.24, def.accent, architect, { keepColor: true });
+  addBox(group, 0.05, 0.12, 0.05, w * 0.42, h * 0.55, d * 0.35, '#e6b422', architect, {
+    keepColor: true,
+    emissive: '#806010',
+  });
+}
+
+function buildRadiator(group, w, h, d, def, architect) {
+  const ribCount = 8;
+  const ribW = w / (ribCount * 2);
+  for (let i = 0; i < ribCount; i++) {
+    const x = -w * 0.5 + ribW + i * ribW * 2;
+    addBox(group, ribW * 0.7, h * 0.85, d, x, h * 0.5, 0, def.color, architect);
+  }
+  addBox(group, w, h * 0.08, d * 1.2, 0, h * 0.96, 0, def.accent, architect);
+  addBox(group, w, h * 0.08, d * 1.2, 0, h * 0.04, 0, def.accent, architect);
+}
+
+function buildLamp(group, w, h, def, architect) {
+  addCylinder(group, w * 0.45, h * 0.03, '#333333', architect);
+  addBox(group, w * 0.08, h * 0.88, w * 0.08, 0, h * 0.47, 0, def.accent, architect);
+  addBox(group, w * 1.4, h * 0.18, w * 1.4, 0, h * 0.94, 0, def.color, architect, { emissive: def.color });
+}
+
+function buildToilet(group, w, h, d, def, architect) {
+  addBox(group, w * 0.55, h * 0.45, d * 0.35, 0, h * 0.78, -d * 0.28, def.accent, architect);
+  addBox(group, w * 0.85, h * 0.35, d * 0.75, 0, h * 0.2, d * 0.05, def.color, architect);
+  addBox(group, w * 0.7, h * 0.08, d * 0.55, 0, h * 0.42, -d * 0.05, def.accent, architect);
+}
+
+function buildSink(group, w, h, d, def, architect) {
+  addBox(group, w, h * 0.75, d * 0.5, 0, h * 0.375, 0, def.color, architect);
+  addBox(group, w * 0.85, h * 0.08, d * 0.7, 0, h * 0.78, 0, def.accent, architect);
+  addBox(group, w * 0.55, h * 0.12, d * 0.45, 0, h * 0.84, d * 0.05, '#d0e8f8', architect, { isGlass: true });
+  addBox(group, 0.04, h * 0.25, 0.04, w * 0.35, h * 0.88, d * 0.25, '#c0c0c0', architect);
+}
+
+function buildBathtub(group, w, h, d, def, architect) {
+  addBox(group, w, h * 0.55, d, 0, h * 0.3, 0, def.color, architect);
+  addBox(group, w * 0.88, h * 0.35, d * 0.82, 0, h * 0.45, 0, '#d8eef8', architect, { isGlass: true });
+  addBox(group, w, h * 0.12, d * 0.08, 0, h * 0.56, -d * 0.46, def.accent, architect);
+}
+
+function makeMaterial(color, architect, { isGlass = false, emissive = null, keepColor = false } = {}) {
+  if (architect && !keepColor) {
+    return new THREE.MeshLambertMaterial({
+      color: isGlass ? 0x88aacc : 0x8899aa,
+      transparent: true,
+      opacity: isGlass ? 0.6 : 0.85,
+    });
+  }
+
+  if (isGlass) {
+    return new THREE.MeshPhysicalMaterial({
+      color: typeof color === 'string' ? color : 0x7ec8ff,
+      transparent: true,
+      opacity: 0.42,
+      roughness: 0.04,
+      metalness: 0.08,
+      transmission: architect ? 0.55 : 0.72,
+      thickness: 0.015,
+      ior: 1.45,
+      side: THREE.DoubleSide,
+    });
+  }
+
+  const mat = new THREE.MeshStandardMaterial({
+    color,
+    roughness: architect ? 0.55 : 0.65,
+    metalness: 0.04,
+  });
+
+  if (emissive) {
+    mat.emissive = new THREE.Color(emissive);
+    mat.emissiveIntensity = architect ? 0.35 : 0.12;
+  }
+
+  return mat;
+}
+
+function addBox(parent, w, h, d, x, y, z, color, architect, opts = {}) {
   const geo = new THREE.BoxGeometry(w, h, d);
-  const mesh = new THREE.Mesh(geo, makeMaterial(color, architect));
+  const mesh = new THREE.Mesh(geo, makeMaterial(color, architect, opts));
   mesh.position.set(x, y, z);
-  mesh.castShadow = !architect;
-  mesh.receiveShadow = !architect;
+  mesh.castShadow = !architect || opts.keepColor;
+  mesh.receiveShadow = !architect || opts.keepColor;
   mesh.userData.isFurniturePart = true;
+  mesh.userData.partColor = color;
+  mesh.userData.isGlass = opts.isGlass ?? false;
+  mesh.userData.emissive = opts.emissive ?? null;
+  mesh.userData.keepColor = opts.keepColor ?? false;
   parent.add(mesh);
 }
 
-function addCylinder(parent, radius, height, color, architect) {
+function addCylinder(parent, radius, height, color, architect, opts = {}) {
   const geo = new THREE.CylinderGeometry(radius, radius * 0.85, height, 12);
-  const mesh = new THREE.Mesh(geo, makeMaterial(color, architect));
+  const mesh = new THREE.Mesh(geo, makeMaterial(color, architect, opts));
   mesh.position.y = height * 0.5;
   mesh.castShadow = !architect;
+  mesh.userData.isFurniturePart = true;
+  mesh.userData.partColor = color;
+  mesh.userData.isGlass = opts.isGlass ?? false;
   parent.add(mesh);
 }
 
-function addSphere(parent, radius, y, color, architect) {
+function addSphere(parent, radius, y, color, architect, opts = {}) {
   const geo = new THREE.SphereGeometry(radius, 12, 10);
-  const mesh = new THREE.Mesh(geo, makeMaterial(color, architect));
+  const mesh = new THREE.Mesh(geo, makeMaterial(color, architect, opts));
   mesh.position.y = y;
   mesh.castShadow = !architect;
+  mesh.userData.isFurniturePart = true;
+  mesh.userData.partColor = color;
   parent.add(mesh);
 }
 
@@ -175,20 +472,18 @@ function addLegs(parent, w, d, legH, color, architect) {
 }
 
 export function updateFurnitureMaterials(group, mode) {
-  const type = group.userData.furnitureType;
-  const def = FURNITURE_CATALOG[type];
   const architect = mode === 'architect';
-  let idx = 0;
   group.traverse((child) => {
-    if (child.isMesh) {
-      const colors = [def.color, def.accent, '#ffffff', '#333'];
-      const color = colors[idx % colors.length];
-      child.material.dispose();
-      child.material = makeMaterial(color, architect);
-      child.castShadow = !architect;
-      child.receiveShadow = !architect;
-      idx++;
-    }
+    if (!child.isMesh) return;
+    const color = child.userData.partColor ?? '#8899aa';
+    child.material.dispose();
+    child.material = makeMaterial(color, architect, {
+      isGlass: child.userData.isGlass,
+      emissive: child.userData.emissive,
+      keepColor: child.userData.keepColor,
+    });
+    child.castShadow = !architect || child.userData.keepColor;
+    child.receiveShadow = !architect || child.userData.keepColor;
   });
 }
 

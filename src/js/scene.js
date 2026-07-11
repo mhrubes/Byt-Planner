@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GRID_SIZE, WALL_HEIGHT, WALL_THICKNESS } from './apartments.js';
-import { createFurnitureMesh, updateFurnitureMaterials } from './furniture.js';
+import { createFurnitureMesh, updateFurnitureMaterials, FURNITURE_CATALOG } from './furniture.js';
 
 export class SceneManager {
   constructor(container) {
@@ -40,10 +40,12 @@ export class SceneManager {
 
     this.wallsGroup = new THREE.Group();
     this.furnitureGroup = new THREE.Group();
+    this.ghostGroup = new THREE.Group();
     this.gridGroup = new THREE.Group();
     this.floorGroup = new THREE.Group();
+    this.placementGhost = null;
     this.raycastPlane = null;
-    this.scene.add(this.floorGroup, this.gridGroup, this.wallsGroup, this.furnitureGroup);
+    this.scene.add(this.floorGroup, this.gridGroup, this.wallsGroup, this.furnitureGroup, this.ghostGroup);
 
     this.setupLights();
     this.animate = this.animate.bind(this);
@@ -176,7 +178,7 @@ export class SceneManager {
     const plotGeo = new THREE.PlaneGeometry(width, depth);
     const plotMat = isPreview
       ? new THREE.MeshStandardMaterial({
-          color: '#a89878',
+          color: this.apartmentBounds ? '#a89878' : this.floorColor,
           roughness: 0.9,
           metalness: 0.02,
         })
@@ -327,8 +329,22 @@ export class SceneManager {
   }
 
   loadDefaultFurniture(items) {
+    this.loadFurnitureFromState(items);
+  }
+
+  getFurnitureState() {
+    return this.furnitureGroup.children.map((f) => ({
+      type: f.userData.furnitureType,
+      x: f.position.x / GRID_SIZE,
+      z: f.position.z / GRID_SIZE,
+      rotation: f.rotation.y,
+    }));
+  }
+
+  loadFurnitureFromState(items) {
     this.clearFurniture();
     for (const item of items) {
+      if (!item?.type) continue;
       this.addFurniture(item.type, item.x, item.z, item.rotation ?? 0);
     }
   }
@@ -396,6 +412,71 @@ export class SceneManager {
       x: Math.round(worldX / GRID_SIZE),
       z: Math.round(worldZ / GRID_SIZE),
     };
+  }
+
+  setPlacementGhost(type) {
+    this.clearPlacementGhost();
+    if (!type) return;
+
+    const ghost = createFurnitureMesh(type, 'architect');
+    if (!ghost) return;
+
+    const isStructural = FURNITURE_CATALOG[type]?.structural;
+
+    ghost.traverse((child) => {
+      if (!child.isMesh) return;
+      child.material = child.material.clone();
+      child.material.transparent = true;
+
+      if (isStructural && child.userData.keepColor) {
+        if (child.userData.isGlass) {
+          child.material.opacity = 0.55;
+        } else {
+          child.material.opacity = 0.72;
+          child.material.emissive?.set?.(child.userData.emissive ?? child.material.color);
+          child.material.emissiveIntensity = 0.25;
+        }
+      } else {
+        child.material.opacity = 0.55;
+        child.material.color.set(0xf59e0b);
+        child.material.emissive?.set?.(0xf59e0b);
+        child.material.emissiveIntensity = 0.15;
+      }
+
+      child.castShadow = false;
+      child.receiveShadow = false;
+    });
+
+    ghost.userData.isGhost = true;
+    ghost.visible = false;
+    this.placementGhost = ghost;
+    this.ghostGroup.add(ghost);
+  }
+
+  updatePlacementGhost(gridX, gridZ) {
+    if (!this.placementGhost) return;
+    this.placementGhost.visible = true;
+    this.placementGhost.position.set(gridX * GRID_SIZE, 0, gridZ * GRID_SIZE);
+  }
+
+  hidePlacementGhost() {
+    if (this.placementGhost) this.placementGhost.visible = false;
+  }
+
+  clearPlacementGhost() {
+    if (!this.placementGhost) return;
+    this.placementGhost.traverse((c) => {
+      if (c.geometry) c.geometry.dispose();
+      if (c.material) c.material.dispose();
+    });
+    this.ghostGroup.remove(this.placementGhost);
+    this.placementGhost = null;
+  }
+
+  getGroundGridPosition(clientX, clientY) {
+    const hit = this.raycast(clientX, clientY, { includeGround: true });
+    if (!hit?.point) return null;
+    return this.snapToGrid(hit.point.x, hit.point.z);
   }
 
   setCameraView(view) {
