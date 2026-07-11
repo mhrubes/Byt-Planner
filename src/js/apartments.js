@@ -189,6 +189,26 @@ export function normalizeWall(w) {
   return { ...w };
 }
 
+/** Uzavře konec zdi na mřížku; se Shift na nejbližších 45° */
+export function snapWallEndpoint(start, end, { snap45 = false } = {}) {
+  const dx = end.x - start.x;
+  const dz = end.z - start.z;
+  const dist = Math.hypot(dx, dz);
+  if (dist < 0.01) return { x: end.x, z: end.z };
+
+  let angle = Math.atan2(dz, dx);
+  if (snap45) {
+    const step = Math.PI / 4;
+    angle = Math.round(angle / step) * step;
+  }
+
+  const gridDist = Math.max(1, Math.round(dist));
+  return {
+    x: start.x + Math.round(Math.cos(angle) * gridDist),
+    z: start.z + Math.round(Math.sin(angle) * gridDist),
+  };
+}
+
 export function cloneWalls(walls) {
   return walls.map((w) => ({ ...w }));
 }

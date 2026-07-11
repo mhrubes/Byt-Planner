@@ -41,11 +41,19 @@ export class SceneManager {
     this.wallsGroup = new THREE.Group();
     this.furnitureGroup = new THREE.Group();
     this.ghostGroup = new THREE.Group();
+    this.wallPreviewGroup = new THREE.Group();
     this.gridGroup = new THREE.Group();
     this.floorGroup = new THREE.Group();
     this.placementGhost = null;
     this.raycastPlane = null;
-    this.scene.add(this.floorGroup, this.gridGroup, this.wallsGroup, this.furnitureGroup, this.ghostGroup);
+    this.scene.add(
+      this.floorGroup,
+      this.gridGroup,
+      this.wallsGroup,
+      this.wallPreviewGroup,
+      this.furnitureGroup,
+      this.ghostGroup
+    );
 
     this.setupLights();
     this.animate = this.animate.bind(this);
@@ -133,6 +141,39 @@ export class SceneManager {
   setWalls(wallSegments) {
     this.walls = wallSegments;
     this.rebuildWalls();
+  }
+
+  setWallPreview(start, end) {
+    this.clearWallPreview();
+    if (!start || !end) return;
+
+    const mesh = this.createWallMesh(
+      { x1: start.x, z1: start.z, x2: end.x, z2: end.z },
+      false
+    );
+    if (!mesh) return;
+
+    mesh.traverse((child) => {
+      if (!child.isMesh) return;
+      child.material = new THREE.MeshBasicMaterial({
+        color: 0x5b8def,
+        transparent: true,
+        opacity: 0.45,
+      });
+    });
+    mesh.userData.isWallPreview = true;
+    this.wallPreviewGroup.add(mesh);
+  }
+
+  clearWallPreview() {
+    while (this.wallPreviewGroup.children.length) {
+      const c = this.wallPreviewGroup.children[0];
+      c.traverse((child) => {
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) child.material.dispose();
+      });
+      this.wallPreviewGroup.remove(c);
+    }
   }
 
   rebuildGrid() {
@@ -277,11 +318,7 @@ export class SceneManager {
     const length = Math.sqrt(dx * dx + dz * dz) * GRID_SIZE;
     if (length < 0.01) return null;
 
-    const geo = new THREE.BoxGeometry(
-      Math.abs(dx) > 0 ? length : WALL_THICKNESS,
-      WALL_HEIGHT,
-      Math.abs(dz) > 0 ? length : WALL_THICKNESS
-    );
+    const geo = new THREE.BoxGeometry(length, WALL_HEIGHT, WALL_THICKNESS);
 
     const mat = isPreview
       ? new THREE.MeshStandardMaterial({
@@ -299,6 +336,7 @@ export class SceneManager {
     const cx = ((w.x1 + w.x2) / 2) * GRID_SIZE;
     const cz = ((w.z1 + w.z2) / 2) * GRID_SIZE;
     mesh.position.set(cx, WALL_HEIGHT / 2, cz);
+    mesh.rotation.y = -Math.atan2(dz, dx);
     mesh.castShadow = isPreview;
     mesh.receiveShadow = isPreview;
 

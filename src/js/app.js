@@ -3,6 +3,7 @@ import {
   APARTMENT_TEMPLATES,
   cloneWalls,
   normalizeWall,
+  snapWallEndpoint,
   wallKey,
   GRID_SIZE,
   getPlotLayout,
@@ -27,9 +28,13 @@ export class BytPlannerApp {
     this.isPlacingDrag = false;
     this.placingType = null;
     this.placingGridPos = null;
+    this.wallSnap45 = false;
+    this.furnitureClipboard = null;
+    this.cursorFollowFurniture = null;
     this.savedData = loadSave() || { apartments: {} };
     this.saveTimer = null;
     this.saveFlashTimer = null;
+    this.copyFlashTimer = null;
     this.leftPanelCollapsed = this.savedData.ui?.leftPanelCollapsed ?? false;
 
     this.renderUI();
@@ -102,8 +107,8 @@ export class BytPlannerApp {
           <div class="hint-box architect-only" id="architect-hints">
             <strong>Režim architekta</strong>
             Klikni na nábytek a táhni. <kbd>R</kbd> otočí. <kbd>Del</kbd> smaže.<br />
-            Nástroj Zeď: klikni start → konec na mřížce (vodorovně/svisle).<br />
-            Modrá čára = stávající byt. Mimo ni můžeš stavět dál.
+            Nástroj Zeď: klikni start → konec (libovolný úhel).<br />
+            Drž <kbd>Shift</kbd> pro úhly po 45°. Modrá čára = stávající byt.
           </div>
           </aside>
           <button
@@ -383,6 +388,7 @@ export class BytPlannerApp {
     this.currentApartment = key;
     this.wallStart = null;
     this.cancelPlacing();
+    this.scene.clearWallPreview();
     this.clearSelection();
 
     const layout = getPlotLayout(tpl.floorSize);
@@ -427,6 +433,7 @@ export class BytPlannerApp {
     this.tool = 'select';
     this.cancelPlacing();
     this.wallStart = null;
+    this.cancelCursorFollow(true);
     this.clearSelection();
 
     this.root.querySelectorAll('.mode-btn').forEach((btn) => {
@@ -454,6 +461,7 @@ export class BytPlannerApp {
     this.tool = tool;
     this.cancelPlacing();
     this.wallStart = null;
+    this.scene.clearWallPreview();
 
     this.root.querySelectorAll('.tool-btn').forEach((btn) => {
       btn.classList.toggle('active', btn.dataset.tool === tool);
@@ -472,9 +480,14 @@ export class BytPlannerApp {
         const label = FURNITURE_CATALOG[this.placingType].label;
         extra = ` · Umisťuješ: ${label}`;
         statusHint = '→ Drž levé tlačítko, táhni a pusť';
+      } else if (this.cursorFollowFurniture) {
+        extra = ' · Umisťuješ kopii';
+        statusHint = '→ Přesuň myší a klikni pro umístění · Esc zruší';
       } else if (this.tool === 'wall') {
         extra = this.wallStart ? ' · Klikni konec zdi' : ' · Klikni začátek zdi';
-        statusHint = this.wallStart ? '→ Druhý klik ukončí zeď' : '→ První klik = začátek zdi';
+        statusHint = this.wallStart
+          ? `→ Druhý klik ukončí zeď${this.wallSnap45 ? ' · 45°' : ' · libovolný úhel'}`
+          : '→ První klik = začátek zdi';
       } else if (this.tool === 'eraser') {
         extra = ' · Klikni na zeď ke smazání';
         statusHint = '→ Klikni na zeď, kterou chceš smazat';
@@ -517,7 +530,8 @@ export class BytPlannerApp {
         <strong>Režim architekta</strong>
         V katalogu vyber položku → na podlaze drž a táhni myší.<br />
         Vybraný nábytek táhni myší. <kbd>R</kbd> otočí. <kbd>Del</kbd> smaže.<br />
-        Nástroj Zeď: klikni start → konec na mřížce (vodorovně/svisle).<br />
+        <kbd>Ctrl+C</kbd> kopíruje · <kbd>Ctrl+V</kbd> vloží kopii k přesunu.<br />
+        Nástroj Zeď: klikni start → konec (libovolný úhel). <kbd>Shift</kbd> = 45°.<br />
         Modrá čára = stávající byt. Mimo ni můžeš stavět dál.
       `;
     }
@@ -627,6 +641,11 @@ export class BytPlannerApp {
   onPointerDown(e) {
     if (e.button !== 0) return;
 
+    if (this.cursorFollowFurniture) {
+      this.confirmCursorFollow();
+      return;
+    }
+
     const hit = this.scene.raycast(e.clientX, e.clientY);
 
     if (this.mode === 'architect') {
@@ -640,7 +659,7 @@ export class BytPlannerApp {
       }
 
       if (this.tool === 'wall') {
-        this.handleWallTool(hit);
+        this.handleWallTool(hit, { shiftKey: e.shiftKey });
         return;
       }
 
@@ -661,6 +680,33 @@ export class BytPlannerApp {
   onPointerMove(e) {
     if (this.placingType) {
       this.updatePlacingGhostFromEvent(e);
+    }
+
+    if (this.mode === 'architect' && this.tool === 'wall' && this.wallStart) {
+      this.wallSnap45 = e.shiftKey;
+      const hit = this.scene.raycast(e.clientX, e.clientY, { includeGround: true });
+      if (hit?.point) {
+        const grid = this.scene.snapToGrid(hit.point.x, hit.point.z);
+        const end = snapWallEndpoint(this.wallStart, grid, { snap45: this.wallSnap45 });
+        this.scene.setWallPreview(this.wallStart, end);
+        this.updateStatus();
+      }
+    }
+
+    if (this.cursorFollowFurniture) {
+      const hit = this.scene.raycast(e.clientX, e.clientY, {
+        includeGround: true,
+        exclude: this.cursorFollowFurniture,
+      });
+      if (hit?.point) {
+        const snapped = this.scene.snapToGrid(hit.point.x, hit.point.z);
+        this.cursorFollowFurniture.position.set(
+          snapped.x * GRID_SIZE,
+          0,
+          snapped.z * GRID_SIZE
+        );
+      }
+      return;
     }
 
     if (!this.isDragging || !this.selectedFurniture) return;
@@ -720,32 +766,28 @@ export class BytPlannerApp {
     this.updateStatus();
   }
 
-  handleWallTool(hit) {
+  handleWallTool(hit, { shiftKey = false } = {}) {
     if (!hit?.point) return;
 
-    const snapped = this.scene.snapToGrid(hit.point.x, hit.point.z);
+    const grid = this.scene.snapToGrid(hit.point.x, hit.point.z);
 
     if (!this.wallStart) {
-      this.wallStart = snapped;
+      this.wallStart = grid;
       this.updateStatus();
       return;
     }
 
+    const end = snapWallEndpoint(this.wallStart, grid, { snap45: shiftKey });
     const wall = normalizeWall({
       x1: this.wallStart.x,
       z1: this.wallStart.z,
-      x2: snapped.x,
-      z2: snapped.z,
+      x2: end.x,
+      z2: end.z,
     });
 
     if (wall.x1 === wall.x2 && wall.z1 === wall.z2) {
       this.wallStart = null;
-      this.updateStatus();
-      return;
-    }
-
-    if (wall.x1 !== wall.x2 && wall.z1 !== wall.z2) {
-      this.wallStart = snapped;
+      this.scene.clearWallPreview();
       this.updateStatus();
       return;
     }
@@ -754,11 +796,12 @@ export class BytPlannerApp {
     if (!this.walls.some((w) => wallKey(w) === key)) {
       this.walls.push(wall);
       this.scene.setWalls(this.walls);
+      this.scheduleSave();
     }
 
     this.wallStart = null;
+    this.scene.clearWallPreview();
     this.updateStatus();
-    this.scheduleSave();
   }
 
   removeWall(segment) {
@@ -800,13 +843,89 @@ export class BytPlannerApp {
     this.clearSelectionHighlight();
   }
 
-  deleteSelected() {
-    if (!this.selectedFurniture || this.mode !== 'architect') return;
-    this.selectedFurniture.traverse((c) => {
+  removeFurnitureObject(obj) {
+    if (!obj) return;
+    obj.traverse((c) => {
       if (c.geometry) c.geometry.dispose();
       if (c.material) c.material.dispose();
     });
-    this.scene.furnitureGroup.remove(this.selectedFurniture);
+    this.scene.furnitureGroup.remove(obj);
+    if (this.cursorFollowFurniture === obj) this.cursorFollowFurniture = null;
+    if (this.selectedFurniture === obj) this.selectedFurniture = null;
+  }
+
+  copySelected() {
+    if (!this.selectedFurniture || this.mode !== 'architect') return;
+
+    this.furnitureClipboard = {
+      type: this.selectedFurniture.userData.furnitureType,
+      rotation: this.selectedFurniture.rotation.y,
+    };
+    this.flashCopyHint('Zkopírováno ✓');
+  }
+
+  pasteFromClipboard() {
+    if (!this.furnitureClipboard || this.mode !== 'architect') return;
+
+    this.cancelPlacing();
+    this.cancelCursorFollow(true);
+
+    let x;
+    let z;
+    if (this.selectedFurniture) {
+      x = this.selectedFurniture.position.x / GRID_SIZE + 1;
+      z = this.selectedFurniture.position.z / GRID_SIZE;
+    } else {
+      const plot = this.plotLayout?.plotSize ?? { width: 12, depth: 10 };
+      x = plot.width / 2;
+      z = plot.depth / 2;
+    }
+
+    const furn = this.scene.addFurniture(
+      this.furnitureClipboard.type,
+      x,
+      z,
+      this.furnitureClipboard.rotation
+    );
+    if (!furn) return;
+
+    this.selectFurniture(furn);
+    this.cursorFollowFurniture = furn;
+    this.scene.controls.enabled = false;
+    this.canvasContainer?.classList.add('placing-mode');
+    this.updateStatus();
+  }
+
+  confirmCursorFollow() {
+    if (!this.cursorFollowFurniture) return;
+    this.cursorFollowFurniture = null;
+    this.scene.controls.enabled = true;
+    this.canvasContainer?.classList.remove('placing-mode');
+    this.scheduleSave();
+    this.updateStatus();
+  }
+
+  cancelCursorFollow(removeObject = true) {
+    if (!this.cursorFollowFurniture) return;
+    const obj = this.cursorFollowFurniture;
+    this.cursorFollowFurniture = null;
+    this.scene.controls.enabled = true;
+    this.canvasContainer?.classList.remove('placing-mode');
+    if (removeObject) this.removeFurnitureObject(obj);
+    else this.clearSelectionHighlight();
+  }
+
+  flashCopyHint(text) {
+    const prev = this.statusBar?.innerHTML;
+    if (!this.statusBar) return;
+    this.statusBar.innerHTML = `<span class="mode-label architect">${text}</span> · Ctrl+V pro vložení`;
+    clearTimeout(this.copyFlashTimer);
+    this.copyFlashTimer = setTimeout(() => this.updateStatus(), 1800);
+  }
+
+  deleteSelected() {
+    if (!this.selectedFurniture || this.mode !== 'architect') return;
+    this.removeFurnitureObject(this.selectedFurniture);
     this.selectedFurniture = null;
     this.updateStatus();
     this.scheduleSave();
@@ -819,6 +938,19 @@ export class BytPlannerApp {
   }
 
   onKeyDown(e) {
+    const mod = e.ctrlKey || e.metaKey;
+
+    if (mod && (e.key === 'c' || e.key === 'C')) {
+      e.preventDefault();
+      this.copySelected();
+      return;
+    }
+    if (mod && (e.key === 'v' || e.key === 'V')) {
+      e.preventDefault();
+      this.pasteFromClipboard();
+      return;
+    }
+
     if (e.key === 'Delete' || e.key === 'Backspace') {
       this.deleteSelected();
     }
@@ -826,8 +958,14 @@ export class BytPlannerApp {
       this.rotateSelected();
     }
     if (e.key === 'Escape') {
+      if (this.cursorFollowFurniture) {
+        this.cancelCursorFollow(true);
+        this.updateStatus();
+        return;
+      }
       this.cancelPlacing();
       this.wallStart = null;
+      this.scene.clearWallPreview();
       this.clearSelection();
       this.updateStatus();
     }
