@@ -1,0 +1,597 @@
+{
+  "furniture": [
+    {
+      "type": "door",
+      "x": 12,
+      "z": 12,
+      "rotation": 3.141592653589793,
+      "doorOpen": false
+    },
+    {
+      "type": "window",
+      "x": 1,
+      "z": 12,
+      "rotation": 3.141592653589793,
+      "doorOpen": false
+    },
+    {
+      "type": "balcony_door",
+      "x": 16,
+      "z": 10.5,
+      "rotation": 1.5707963267948966,
+      "doorOpen": false
+    },
+    {
+      "type": "door",
+      "x": 6,
+      "z": 5,
+      "rotation": 1.5707963267948966,
+      "doorOpen": false
+    },
+    {
+      "type": "desk_medium",
+      "x": 5.5,
+      "z": 3,
+      "rotation": 23.561944901923464
+    },
+    {
+      "type": "door",
+      "x": 6,
+      "z": 8.5,
+      "rotation": 1.5707963267948966,
+      "doorOpen": false
+    },
+    {
+      "type": "bed_single",
+      "x": 1,
+      "z": 7,
+      "rotation": 1.5707963267948966
+    },
+    {
+      "type": "wardrobe",
+      "x": 0.5,
+      "z": 8.5,
+      "rotation": 1.5707963267948966,
+      "doorOpen": false
+    },
+    {
+      "type": "desk_small",
+      "x": 3.5,
+      "z": 11.5,
+      "rotation": 3.141592653589793
+    },
+    {
+      "type": "shelf_medium",
+      "x": 2.5,
+      "z": 11.5,
+      "rotation": 3.141592653589793
+    },
+    {
+      "type": "door",
+      "x": 6,
+      "z": 0.5,
+      "rotation": -1.5707963267948966,
+      "doorOpen": false
+    },
+    {
+      "type": "sofa",
+      "x": 9.5,
+      "z": 10.5,
+      "rotation": 4.71238898038469
+    },
+    {
+      "type": "table",
+      "x": 8.5,
+      "z": 10.5,
+      "rotation": 1.5707963267948966
+    },
+    {
+      "type": "tv",
+      "x": 6,
+      "z": 10.5,
+      "rotation": 1.5707963267948966,
+      "tvStyle": "wall_inset"
+    },
+    {
+      "type": "carpet",
+      "x": 9,
+      "z": 10.5,
+      "rotation": 0,
+      "sizeW": 4,
+      "sizeD": 3,
+      "carpetShape": "oval",
+      "carpetPattern": "border",
+      "carpetColor": "#bc7238",
+      "carpetAccent": "#1dd4d7"
+    },
+    {
+      "type": "lamp_medium",
+      "x": 10,
+      "z": 11.5,
+      "rotation": 0
+    },
+    {
+      "type": "plant_large",
+      "x": 15.5,
+      "z": 11.5,
+      "rotation": 0
+    },
+    {
+      "type": "shelf_large_cabinet",
+      "x": 15.5,
+      "z": 8.5,
+      "rotation": 4.71238898038469,
+      "doorOpen": false
+    },
+    {
+      "type": "lamp_wall",
+      "x": 6,
+      "z": 6.5,
+      "rotation": 1.5707963267948966
+    },
+    {
+      "type": "window_large",
+      "x": 16,
+      "z": 6.5,
+      "rotation": -1.5707963267948966,
+      "doorOpen": false
+    },
+    {
+      "type": "shelf_small",
+      "x": 0.5,
+      "z": 2.5,
+      "rotation": 1.5707963267948968
+    },
+    {
+      "type": "shelf_small",
+      "x": 2.5,
+      "z": 0.5,
+      "rotation": 12.566370614359176
+    },
+    {
+      "type": "bed_double",
+      "x": 2,
+      "z": 2,
+      "rotation": 0.7853981633974484
+    },
+    {
+      "type": "window_large",
+      "x": 0,
+      "z": 2.5,
+      "rotation": 1.5707963267948966,
+      "doorOpen": false
+    },
+    {
+      "type": "plant_medium",
+      "x": 0.5,
+      "z": 0.5,
+      "rotation": 0
+    },
+    {
+      "type": "chair",
+      "x": 5,
+      "z": 3,
+      "rotation": 1.5707963267948966
+    },
+    {
+      "type": "wardrobe",
+      "x": 2.2,
+      "z": 5.5,
+      "rotation": 3.141592653589793,
+      "doorOpen": false,
+      "furnitureGroupId": "grp-35",
+      "groupAnchorId": "f-82",
+      "groupOffsetX": -0.9749999999999996,
+      "groupOffsetZ": 0,
+      "groupMode": "row"
+    },
+    {
+      "type": "shelf_medium_cabinet",
+      "x": 3.175,
+      "z": 5.5,
+      "rotation": 3.1415926535897927,
+      "doorOpen": false,
+      "furnitureGroupId": "grp-35",
+      "groupAnchorId": "f-82",
+      "groupOffsetX": 0,
+      "groupOffsetZ": 0,
+      "groupMode": "row"
+    },
+    {
+      "type": "wardrobe",
+      "x": 1,
+      "z": 5.5,
+      "rotation": 3.1415926535897927,
+      "doorOpen": false,
+      "furnitureGroupId": "grp-35",
+      "groupAnchorId": "f-82",
+      "groupOffsetX": -2.174999999999999,
+      "groupOffsetZ": 0,
+      "groupMode": "row"
+    },
+    {
+      "type": "window",
+      "x": 5,
+      "z": 12,
+      "rotation": 3.141592653589793,
+      "doorOpen": false
+    },
+    {
+      "type": "chair",
+      "x": 3.5,
+      "z": 11,
+      "rotation": 0
+    },
+    {
+      "type": "bookshelf",
+      "x": 5.5,
+      "z": 6.5,
+      "rotation": 5.497787143782138
+    },
+    {
+      "type": "shelf_medium",
+      "x": 5.5,
+      "z": 10,
+      "rotation": -1.5707963267948968,
+      "furnitureGroupId": "grp-37",
+      "groupAnchorId": "f-86",
+      "groupOffsetX": 0,
+      "groupOffsetZ": 0,
+      "groupMode": "row"
+    },
+    {
+      "type": "shelf_medium",
+      "x": 5.5,
+      "z": 10.75,
+      "rotation": -1.5707963267948883,
+      "furnitureGroupId": "grp-37",
+      "groupAnchorId": "f-86",
+      "groupOffsetX": 0,
+      "groupOffsetZ": 0.75,
+      "groupMode": "row"
+    },
+    {
+      "type": "kitchen_fridge",
+      "x": 11.075,
+      "z": 0.5,
+      "rotation": 3.0628549591415595e-15,
+      "doorOpen": false,
+      "furnitureGroupId": "grp-39",
+      "groupAnchorId": "f-45",
+      "groupOffsetX": 0,
+      "groupOffsetZ": 0,
+      "groupMode": "row"
+    },
+    {
+      "type": "kitchen_dishwasher",
+      "x": 11.7,
+      "z": 0.5,
+      "rotation": 3.0628549591415595e-15,
+      "doorOpen": false,
+      "furnitureGroupId": "grp-39",
+      "groupAnchorId": "f-45",
+      "groupOffsetX": 0.625,
+      "groupOffsetZ": -1.7763568394002505e-15,
+      "groupMode": "row"
+    },
+    {
+      "type": "kitchen_unit",
+      "x": 12.5,
+      "z": 0.5,
+      "rotation": 3.0628549591415595e-15,
+      "furnitureGroupId": "grp-39",
+      "groupAnchorId": "f-45",
+      "groupOffsetX": 1.4250000000000007,
+      "groupOffsetZ": -3.552713678800501e-15,
+      "groupMode": "row"
+    },
+    {
+      "type": "kitchen_unit",
+      "x": 13.5,
+      "z": 0.5,
+      "rotation": 3.0628549591415595e-15,
+      "furnitureGroupId": "grp-39",
+      "groupAnchorId": "f-45",
+      "groupOffsetX": 2.4250000000000007,
+      "groupOffsetZ": -7.105427357601002e-15,
+      "groupMode": "row"
+    },
+    {
+      "type": "kitchen_unit",
+      "x": 14.5,
+      "z": 0.5,
+      "rotation": -2.4492935982947064e-16,
+      "furnitureGroupId": "grp-39",
+      "groupAnchorId": "f-45",
+      "groupOffsetX": 3.4250000000000007,
+      "groupOffsetZ": -1.0658141036401503e-14,
+      "groupMode": "row"
+    },
+    {
+      "type": "kitchen_oven",
+      "x": 15.3,
+      "z": 0.5,
+      "rotation": 3.0628549591415595e-15,
+      "doorOpen": false,
+      "furnitureGroupId": "grp-39",
+      "groupAnchorId": "f-45",
+      "groupOffsetX": 4.225000000000001,
+      "groupOffsetZ": -1.2434497875801753e-14,
+      "groupMode": "row"
+    },
+    {
+      "type": "door",
+      "x": 8,
+      "z": 4,
+      "rotation": 0,
+      "doorOpen": false
+    },
+    {
+      "type": "bathtub",
+      "x": 10,
+      "z": 3,
+      "rotation": 5.497787143782138
+    },
+    {
+      "type": "toilet",
+      "x": 6.5,
+      "z": 3.5,
+      "rotation": 8.63937979737193
+    },
+    {
+      "type": "lamp_wall",
+      "x": 9,
+      "z": 0,
+      "rotation": 0
+    },
+    {
+      "type": "lamp_wall",
+      "x": 7,
+      "z": 0,
+      "rotation": 0
+    },
+    {
+      "type": "lamp_wall",
+      "x": 9,
+      "z": 4,
+      "rotation": 3.141592653589793
+    },
+    {
+      "type": "bath_shelf",
+      "x": 9.5,
+      "z": 1.5,
+      "rotation": 4.71238898038469,
+      "doorOpen": false,
+      "furnitureGroupId": "grp-41",
+      "groupAnchorId": "f-104",
+      "groupOffsetX": 0,
+      "groupOffsetZ": 0.6849999999999987,
+      "groupMode": "row"
+    },
+    {
+      "type": "sink",
+      "x": 9.5,
+      "z": 0.815,
+      "rotation": 4.7123889803847,
+      "furnitureGroupId": "grp-41",
+      "groupAnchorId": "f-104",
+      "groupOffsetX": 0,
+      "groupOffsetZ": 0,
+      "groupMode": "row"
+    },
+    {
+      "type": "lamp_ceiling",
+      "x": 4,
+      "z": 3,
+      "rotation": 0
+    },
+    {
+      "type": "lamp_ceiling",
+      "x": 3.5,
+      "z": 9,
+      "rotation": 0
+    },
+    {
+      "type": "lamp_ceiling",
+      "x": 13,
+      "z": 10,
+      "rotation": 0
+    },
+    {
+      "type": "lamp_wall",
+      "x": 13,
+      "z": 0,
+      "rotation": 0
+    },
+    {
+      "type": "lamp_pendant",
+      "x": 14,
+      "z": 5,
+      "rotation": 0
+    },
+    {
+      "type": "bookshelf",
+      "x": 6.5,
+      "z": 6.7,
+      "rotation": 1.5707963267949014,
+      "furnitureGroupId": "grp-17",
+      "groupAnchorId": "f-40",
+      "groupOffsetX": 0,
+      "groupOffsetZ": 0,
+      "groupMode": "layout"
+    },
+    {
+      "type": "bookshelf",
+      "x": 6.5,
+      "z": 7.5,
+      "rotation": 1.5707963267948963,
+      "furnitureGroupId": "grp-17",
+      "groupAnchorId": "f-40",
+      "groupOffsetX": 3.552713678800501e-15,
+      "groupOffsetZ": 0.8000000000000007,
+      "groupMode": "layout"
+    },
+    {
+      "type": "chair",
+      "x": 15,
+      "z": 5.5,
+      "rotation": -2.3561944901923453,
+      "furnitureGroupId": "grp-24",
+      "groupAnchorId": "f-31",
+      "groupOffsetX": 2,
+      "groupOffsetZ": 1,
+      "groupMode": "layout"
+    },
+    {
+      "type": "chair",
+      "x": 13,
+      "z": 5.5,
+      "rotation": 2.356194490192345,
+      "furnitureGroupId": "grp-24",
+      "groupAnchorId": "f-31",
+      "groupOffsetX": 0,
+      "groupOffsetZ": 1,
+      "groupMode": "layout"
+    },
+    {
+      "type": "chair",
+      "x": 13.5,
+      "z": 6,
+      "rotation": 2.356194490192345,
+      "furnitureGroupId": "grp-24",
+      "groupAnchorId": "f-31",
+      "groupOffsetX": 0.5,
+      "groupOffsetZ": 1.5,
+      "groupMode": "layout"
+    },
+    {
+      "type": "chair",
+      "x": 14.5,
+      "z": 6,
+      "rotation": -2.3561944901923453,
+      "furnitureGroupId": "grp-24",
+      "groupAnchorId": "f-31",
+      "groupOffsetX": 1.5,
+      "groupOffsetZ": 1.5,
+      "groupMode": "layout"
+    },
+    {
+      "type": "dining_table_xl",
+      "x": 14,
+      "z": 5,
+      "rotation": -2.3561944901923453,
+      "furnitureGroupId": "grp-24",
+      "groupAnchorId": "f-31",
+      "groupOffsetX": 1,
+      "groupOffsetZ": 0.5,
+      "groupMode": "layout"
+    },
+    {
+      "type": "chair",
+      "x": 13,
+      "z": 4.5,
+      "rotation": 0.7853981633974484,
+      "furnitureGroupId": "grp-24",
+      "groupAnchorId": "f-31",
+      "groupOffsetX": 0,
+      "groupOffsetZ": 0,
+      "groupMode": "layout"
+    },
+    {
+      "type": "chair",
+      "x": 13.5,
+      "z": 4,
+      "rotation": 0.7853981633974484,
+      "furnitureGroupId": "grp-24",
+      "groupAnchorId": "f-31",
+      "groupOffsetX": 0.5,
+      "groupOffsetZ": -0.5,
+      "groupMode": "layout"
+    },
+    {
+      "type": "chair",
+      "x": 14.5,
+      "z": 4,
+      "rotation": -0.7853981633974485,
+      "furnitureGroupId": "grp-24",
+      "groupAnchorId": "f-31",
+      "groupOffsetX": 1.5,
+      "groupOffsetZ": -0.5,
+      "groupMode": "layout"
+    },
+    {
+      "type": "chair",
+      "x": 15,
+      "z": 4.5,
+      "rotation": -0.7853981633974485,
+      "furnitureGroupId": "grp-24",
+      "groupAnchorId": "f-31",
+      "groupOffsetX": 2,
+      "groupOffsetZ": 0,
+      "groupMode": "layout"
+    }
+  ],
+  "walls": [
+    {
+      "x1": 0,
+      "z1": 0,
+      "x2": 16,
+      "z2": 0
+    },
+    {
+      "x1": 16,
+      "z1": 0,
+      "x2": 16,
+      "z2": 12
+    },
+    {
+      "x1": 16,
+      "z1": 12,
+      "x2": 0,
+      "z2": 12
+    },
+    {
+      "x1": 0,
+      "z1": 12,
+      "x2": 0,
+      "z2": 0
+    },
+    {
+      "x1": 0,
+      "z1": 6,
+      "x2": 6,
+      "z2": 6
+    },
+    {
+      "x1": 6,
+      "z1": 0,
+      "x2": 6,
+      "z2": 12
+    },
+    {
+      "x1": 10,
+      "z1": 0,
+      "x2": 10,
+      "z2": 2
+    },
+    {
+      "x1": 10,
+      "z1": 2,
+      "x2": 11,
+      "z2": 3
+    },
+    {
+      "x1": 11,
+      "z1": 3,
+      "x2": 11,
+      "z2": 4
+    },
+    {
+      "x1": 6,
+      "z1": 4,
+      "x2": 11,
+      "z2": 4
+    }
+  ],
+  "wallColors": {}
+}
