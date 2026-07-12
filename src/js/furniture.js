@@ -24,6 +24,28 @@ const FURNITURE_ITEMS = {
     sillHeight: 0.9,
     structural: true,
   },
+  window_small: {
+    label: 'Malé okno',
+    icon: '🪟',
+    size: { w: 0.55, h: 0.72, d: 0.12 },
+    color: '#f5f8fc',
+    accent: '#2563b0',
+    inner: '#dce8f5',
+    back: '#8eb4e8',
+    sillHeight: 1.15,
+    structural: true,
+  },
+  window_large: {
+    label: 'Velké okno',
+    icon: '🖼️',
+    size: { w: 2.0, h: 1.55, d: 0.14 },
+    color: '#f5f8fc',
+    accent: '#2563b0',
+    inner: '#dce8f5',
+    back: '#8eb4e8',
+    sillHeight: 0.85,
+    structural: true,
+  },
   balcony_door: {
     label: 'Balkónové dveře',
     icon: '🏠',
@@ -425,7 +447,7 @@ export const CATALOG_CATEGORIES = [
     id: 'structural',
     label: 'Stavební prvky',
     icon: '🏗️',
-    items: ['door', 'window', 'balcony_door', 'radiator'],
+    items: ['door', 'window', 'window_small', 'window_large', 'balcony_door', 'radiator'],
   },
   {
     id: 'living',
@@ -467,7 +489,9 @@ export const CATALOG_CATEGORIES = [
 export const FURNITURE_CATALOG = { ...FURNITURE_ITEMS };
 
 export const DOOR_TYPES = new Set(['door', 'balcony_door']);
-export const WALL_GAP_TYPES = new Set(['door', 'balcony_door', 'window']);
+export const WALL_GAP_TYPES = new Set(['door', 'balcony_door', 'window', 'window_small', 'window_large']);
+
+export const WINDOW_TYPES = new Set(['window', 'window_small', 'window_large']);
 export const SHELF_CABINET_TYPES = new Set([
   'shelf_small_cabinet',
   'shelf_medium_cabinet',
@@ -527,7 +551,7 @@ export function getCarpetPatternsForType(type) {
 export const OPENABLE_TYPES = new Set([
   'door',
   'balcony_door',
-  'window',
+  ...WINDOW_TYPES,
   'bath_shelf',
   'kitchen_oven',
   'kitchen_dishwasher',
@@ -544,6 +568,10 @@ export function isDoorType(type) {
 
 export function isWallGapType(type) {
   return WALL_GAP_TYPES.has(type);
+}
+
+export function isWindowType(type) {
+  return WINDOW_TYPES.has(type);
 }
 
 export function isShelfCabinetType(type) {
@@ -610,6 +638,8 @@ export function createFurnitureMesh(type, mode = 'preview', {
       buildDoor(group, w, h, d, def, isArchitect);
       break;
     case 'window':
+    case 'window_small':
+    case 'window_large':
       buildWindow(group, w, h, d, def, isArchitect);
       break;
     case 'balcony_door':
@@ -1872,14 +1902,14 @@ function buildBalconyDoor(group, w, h, d, def, architect) {
 function buildWindow(group, w, h, d, def, architect) {
   const sill = def.sillHeight ?? 0.9;
   const cy = sill + h * 0.5;
-  const frame = 0.07;
+  const frame = Math.min(0.07, w * 0.11, h * 0.1);
   const glassW = w - frame * 2;
   const glassH = h - frame * 2;
   const winD = Math.max(d * 1.1, 0.18);
 
   addHollowOpeningFrame(group, w, h, winD, def.accent, def.color, architect, {
     centerY: cy,
-    bottomH: 0.08,
+    bottomH: Math.max(0.05, frame * 0.95),
   });
 
   const sashPivot = new THREE.Group();
@@ -1898,13 +1928,26 @@ function buildWindow(group, w, h, d, def, architect) {
     partRole: 'sash',
   });
 
+  if (w >= 1.75) {
+    addBox(group, frame * 0.75, glassH * 0.9, winD * 0.52, 0, cy, 0, def.accent, architect, {
+      keepColor: true,
+      partRole: 'frame',
+      doubleSided: true,
+    });
+    addBox(sashPivot, frame * 0.55, glassH * 0.88, winD * 0.24, glassW * 0.5, 0, winD * 0.15, '#7ec8ff', architect, {
+      keepColor: true,
+      isGlass: true,
+      partRole: 'sash',
+    });
+  }
+
   addBox(group, glassW * 0.9, glassH * 0.9, 0.025, 0, cy, -winD * 0.48, def.back ?? def.inner, architect, {
     keepColor: true,
     emissive: '#5577aa',
     partRole: 'sash-back',
     doubleSided: true,
   });
-  addBox(group, w + 0.1, 0.08, winD * 0.75, 0, sill + 0.04, winD * 0.18, def.accent, architect, {
+  addBox(group, w + 0.1, Math.max(0.06, frame * 0.95), winD * 0.75, 0, sill + 0.04, winD * 0.18, def.accent, architect, {
     keepColor: true,
     doubleSided: true,
     partRole: 'frame',
@@ -2863,7 +2906,7 @@ export function applyDoorOpenState(group, open) {
   if (!isOpenableType(group.userData.furnitureType)) return;
 
   group.userData.doorOpen = !!open;
-  const isWindow = group.userData.furnitureType === 'window';
+  const isWindow = isWindowType(group.userData.furnitureType);
 
   group.traverse((child) => {
     const role = child.userData.partRole;

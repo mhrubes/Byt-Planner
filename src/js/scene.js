@@ -7,6 +7,7 @@ import {
   FURNITURE_CATALOG,
   isDoorType,
   isWallGapType,
+  isWindowType,
   isTvType,
   isOpenableType,
   isCarpetType,
@@ -393,7 +394,7 @@ export class SceneManager {
     }
 
     for (const opening of wallOpenings) {
-      if (opening.type === 'window') {
+      if (isWindowType(opening.type)) {
         const infills = this.createWindowWallInfills(opening, isPreview);
         infills.forEach((mesh) => this.wallsGroup.add(mesh));
       } else {

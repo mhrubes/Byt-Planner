@@ -18,7 +18,7 @@ import {
   snapOpeningRotationToWall,
   isOpeningOnWall,
 } from './apartments.js';
-import { FURNITURE_CATALOG, CATALOG_CATEGORIES, isDoorType, isWallGapType, isOpenableType, isShelfCabinetType, isCarpetType, isTvType, usesWallSnap, TV_STYLES, TV_STYLE_DEFAULTS, CARPET_SHAPES, CARPET_STYLE_DEFAULTS, getCarpetPatternsForType, rebuildCarpetGroup, rebuildTvGroup, applyDoorOpenState, getFurnitureMountOffset } from './furniture.js';
+import { FURNITURE_CATALOG, CATALOG_CATEGORIES, isDoorType, isWallGapType, isWindowType, isOpenableType, isShelfCabinetType, isCarpetType, isTvType, usesWallSnap, TV_STYLES, TV_STYLE_DEFAULTS, CARPET_SHAPES, CARPET_STYLE_DEFAULTS, getCarpetPatternsForType, rebuildCarpetGroup, rebuildTvGroup, applyDoorOpenState, getFurnitureMountOffset } from './furniture.js';
 import { SceneManager } from './scene.js';
 import { loadSave, writeSave, clearSave } from './storage.js';
 
@@ -1626,11 +1626,12 @@ export class BytPlannerApp {
 
   getOpenableLabels(type, open) {
     const isDoor = isDoorType(type);
-    const isWindow = type === 'window';
+    const isWindow = isWindowType(type);
 
     if (isWindow) {
+      const def = FURNITURE_CATALOG[type];
       return {
-        title: 'Okno',
+        title: def?.label ?? 'Okno',
         toggleLabel: open ? '🔒 Zavřít okno' : '🪟 Otevřít okno',
       };
     }
@@ -1680,7 +1681,7 @@ export class BytPlannerApp {
     const type = obj.userData.furnitureType;
     const def = FURNITURE_CATALOG[type];
     let topY = def?.size?.h ?? 1;
-    if (type === 'window') {
+    if (isWindowType(type)) {
       topY = (def.sillHeight ?? 0.9) + (def.size?.h ?? 1);
     }
     const anchor = new THREE.Vector3();
@@ -1739,7 +1740,7 @@ export class BytPlannerApp {
   }
 
   getOpenableHint(type) {
-    if (type === 'window') return 'Vyklopí křídlo okna · klávesa O';
+    if (isWindowType(type)) return 'Vyklopí křídlo okna · klávesa O';
     if (type === 'wardrobe') return 'Ukáže nebo skryje oblečení ve skříni · klávesa O';
     if (type === 'bath_shelf') return 'Otevře lamelová dvířka s ručníky uvnitř · klávesa O';
     if (type === 'kitchen_oven') return 'Sklopí dvířka trouby a ukáže plech uvnitř · klávesa O';
