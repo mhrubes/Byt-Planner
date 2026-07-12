@@ -10,7 +10,7 @@ import {
   shiftWallsToPlot,
   shiftFurnitureToPlot,
 } from './apartments.js';
-import { FURNITURE_CATALOG, CATALOG_CATEGORIES, isDoorType, isOpenableType, applyDoorOpenState } from './furniture.js';
+import { FURNITURE_CATALOG, CATALOG_CATEGORIES, isDoorType, isOpenableType, isShelfCabinetType, applyDoorOpenState } from './furniture.js';
 import { SceneManager } from './scene.js';
 import { loadSave, writeSave, clearSave } from './storage.js';
 
@@ -1004,8 +1004,18 @@ export class BytPlannerApp {
       this.doorOpenToggle.textContent = open ? '🔒 Zavřít okno' : '🪟 Otevřít okno';
       this.root.querySelector('#door-open-hint').textContent =
         'Vyklopí křídlo okna · klávesa O';
+    } else if (isShelfCabinetType(item.userData.furnitureType)) {
+      this.openableOptionsTitle.textContent = 'Skříňka';
+      this.doorOpenToggle.textContent = open ? '🔒 Zavřít dvířka' : '🗄️ Otevřít dvířka';
+      this.root.querySelector('#door-open-hint').textContent =
+        'Otevře nebo zavře dvířka skříňky · klávesa O';
+    } else if (isDoor) {
+      this.openableOptionsTitle.textContent = 'Dveře';
+      this.doorOpenToggle.textContent = open ? '🔒 Zavřít průchod' : '🚪 Otevřít průchod';
+      this.root.querySelector('#door-open-hint').textContent =
+        'Přepne otevřený průchod ve zdi · klávesa O';
     } else {
-      this.openableOptionsTitle.textContent = isDoor ? 'Dveře' : 'Balkónové dveře';
+      this.openableOptionsTitle.textContent = 'Balkónové dveře';
       this.doorOpenToggle.textContent = open ? '🔒 Zavřít průchod' : '🚪 Otevřít průchod';
       this.root.querySelector('#door-open-hint').textContent =
         'Přepne otevřený průchod ve zdi · klávesa O';
