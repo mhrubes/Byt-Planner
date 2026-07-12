@@ -20,12 +20,14 @@ import {
 } from './apartments.js';
 import { FURNITURE_CATALOG, CATALOG_CATEGORIES, isDoorType, isWallGapType, isWindowType, isOpenableType, isShelfCabinetType, isCarpetType, isTvType, usesWallSnap, TV_STYLES, TV_STYLE_DEFAULTS, CARPET_SHAPES, CARPET_STYLE_DEFAULTS, getCarpetPatternsForType, rebuildCarpetGroup, rebuildTvGroup, applyDoorOpenState, getFurnitureMountOffset } from './furniture.js';
 import {
-  assignFurnitureGroup,
+  assignFurnitureGroupLayout,
+  assignFurnitureGroupRow,
   canGroupFurnitureItems,
   clearFurnitureGroup,
   dissolvePartialGroups,
   getGroupMembers,
   nextGroupId,
+  rotateGroupLayout,
   snapFurnitureRow,
   updateGroupOffsets,
 } from './furniture-groups.js';
@@ -127,12 +129,16 @@ export class BytPlannerApp {
 
           <section class="panel-section architect-only hidden" id="group-options">
             <h3>Skupina nábytku</h3>
-            <p class="save-hint" id="group-options-hint">Vyber více položek a seskup je do řady</p>
+            <p class="save-hint" id="group-options-hint">Vyber více položek Ctrl+klikem</p>
             <div class="save-row">
               <button type="button" class="save-btn" id="group-create-btn">🔗 Seskupit</button>
+              <button type="button" class="save-btn secondary" id="group-row-btn">↔️ Do řady</button>
+            </div>
+            <div class="save-row">
               <button type="button" class="save-btn secondary" id="group-dissolve-btn">✂️ Rozebrat</button>
             </div>
-            <p class="save-hint">Ctrl+klik přidá do výběru · <kbd>Ctrl+G</kbd> seskupí · <kbd>Ctrl+Shift+G</kbd> rozebere</p>
+            <p class="save-hint">Seskupit = zachová rozložení (stůl + židle) · Do řady = bez mezer (kuchyně)<br />
+            <kbd>Ctrl+G</kbd> seskupí · <kbd>Ctrl+Shift+G</kbd> rozebere</p>
           </section>
 
           <section class="panel-section architect-only hidden" id="door-options">
@@ -278,6 +284,7 @@ export class BytPlannerApp {
     this.groupOptionsPanel = this.root.querySelector('#group-options');
     this.groupOptionsHint = this.root.querySelector('#group-options-hint');
     this.groupCreateBtn = this.root.querySelector('#group-create-btn');
+    this.groupRowBtn = this.root.querySelector('#group-row-btn');
     this.groupDissolveBtn = this.root.querySelector('#group-dissolve-btn');
     this.renderCarpetShapeButtons();
     this.renderTvStyleButtons();
@@ -887,7 +894,7 @@ export class BytPlannerApp {
           extra += ` · Skupina (${groupSize})`;
         }
         statusHint = count > 1
-          ? '→ Ctrl+G seskupí · táhni jako celek po seskupení'
+          ? '→ Ctrl+G seskupí (zachová rozložení) · táhni jako celek'
           : '→ Ctrl+klik více výběrů · Delete smaže · R otočí';
       }
     }
@@ -951,7 +958,8 @@ export class BytPlannerApp {
         <strong>Režim architekta</strong>
         V katalogu vyber položku → na podlaze drž a táhni myší.<br />
         Vybraný nábytek táhni myší. <kbd>Ctrl</kbd>+klik vybere více kusů.<br />
-        <kbd>Ctrl+G</kbd> seskupí řadu bez mezer · skupinu táhneš jako celek.<br />
+        <kbd>Ctrl+G</kbd> seskupí výběr a zachová rozložení (stůl se židlemi).<br />
+        <kbd>↔️ Do řady</kbd> přitáhne kusy těsně k sobě (kuchyňská linka).<br />
         <kbd>R</kbd> otočí o 45°. <kbd>Del</kbd> smaže. <kbd>Ctrl+C</kbd> / <kbd>Ctrl+V</kbd> kopíruje.<br />
         U dveří: <kbd>O</kbd> otevře/zavře průchod ve zdi.<br />
         Nástroj Zeď: klikni start → konec (libovolný úhel). <kbd>Shift</kbd> = 45°.<br />
@@ -1025,6 +1033,7 @@ export class BytPlannerApp {
     this.carpetColorAccent?.addEventListener('input', () => this.applyCarpetColor('carpetAccent', this.carpetColorAccent.value));
 
     this.groupCreateBtn?.addEventListener('click', () => this.groupSelectedFurniture());
+    this.groupRowBtn?.addEventListener('click', () => this.groupSelectedFurnitureRow());
     this.groupDissolveBtn?.addEventListener('click', () => this.ungroupSelectedFurniture());
 
     window.addEventListener('beforeunload', () => {
@@ -1591,10 +1600,18 @@ export class BytPlannerApp {
   }
 
   groupSelectedFurniture() {
+    this.groupSelectedFurnitureWithMode('layout');
+  }
+
+  groupSelectedFurnitureRow() {
+    this.groupSelectedFurnitureWithMode('row');
+  }
+
+  groupSelectedFurnitureWithMode(mode = 'layout') {
     if (this.mode !== 'architect') return;
 
     const items = this.getItemsForGrouping();
-    const check = canGroupFurnitureItems(items);
+    const check = canGroupFurnitureItems(items, { mode });
     if (!check.ok) {
       this.flashCopyHint(check.reason);
       return;
@@ -1603,7 +1620,9 @@ export class BytPlannerApp {
     dissolvePartialGroups(this.scene.furnitureGroup, items);
 
     const groupId = nextGroupId();
-    const anchor = assignFurnitureGroup(items, groupId);
+    const anchor = mode === 'row'
+      ? assignFurnitureGroupRow(items, groupId)
+      : assignFurnitureGroupLayout(items, groupId);
 
     for (const obj of items) {
       this.highlightFurniture(obj);
@@ -1614,7 +1633,8 @@ export class BytPlannerApp {
     this.updateGroupOptionsPanel();
     this.updateStatus();
     this.scheduleSave();
-    this.flashCopyHint(`Seskupeno ✓ (${items.length} položek)`);
+    const label = mode === 'row' ? 'Seskupeno do řady ✓' : 'Seskupeno ✓';
+    this.flashCopyHint(`${label} (${items.length} položek)`);
   }
 
   ungroupSelectedFurniture() {
@@ -1644,23 +1664,31 @@ export class BytPlannerApp {
 
     if (!show) return;
 
-    const canGroup = canGroupFurnitureItems(this.getItemsForGrouping());
+    const items = this.getItemsForGrouping();
+    const canLayout = canGroupFurnitureItems(items, { mode: 'layout' });
+    const canRow = canGroupFurnitureItems(items, { mode: 'row' });
     if (this.groupOptionsHint) {
       if (count >= 2) {
-        this.groupOptionsHint.textContent = canGroup.ok
-          ? `Seskupíš ${count} položky těsně vedle sebe`
-          : canGroup.reason;
+        this.groupOptionsHint.textContent = canLayout.ok
+          ? `Seskupíš ${count} položek — i s různou rotací židlí`
+          : canLayout.reason;
       } else if (inGroup) {
         const groupSize = getGroupMembers(
           this.scene.furnitureGroup,
           this.selectedFurniture.userData.furnitureGroupId,
         ).length;
-        this.groupOptionsHint.textContent = `Skupina má ${groupSize} položek — táhni jako celek`;
+        const modeLabel = this.selectedFurniture.userData.groupMode === 'row'
+          ? 'řada bez mezer'
+          : 'zachované rozložení';
+        this.groupOptionsHint.textContent = `Skupina (${groupSize}) — ${modeLabel} · táhni jako celek`;
       }
     }
 
     if (this.groupCreateBtn) {
-      this.groupCreateBtn.disabled = !canGroup.ok;
+      this.groupCreateBtn.disabled = !canLayout.ok;
+    }
+    if (this.groupRowBtn) {
+      this.groupRowBtn.disabled = !canRow.ok;
     }
     if (this.groupDissolveBtn) {
       this.groupDissolveBtn.disabled = !inGroup;
@@ -2196,6 +2224,22 @@ export class BytPlannerApp {
     const targets = groupId
       ? getGroupMembers(this.scene.furnitureGroup, groupId)
       : [this.selectedFurniture];
+    const groupMode = this.selectedFurniture.userData.groupMode ?? 'layout';
+    const delta = step * FURNITURE_ROTATION_STEP;
+
+    if (groupId && targets.length > 1 && groupMode === 'layout') {
+      const anchorId = targets[0].userData.groupAnchorId;
+      const anchor = targets.find((obj) => obj.userData.furnitureId === anchorId) ?? targets[0];
+      rotateGroupLayout(targets, anchor, delta);
+
+      if (this.mode === 'architect') {
+        this.scheduleSave();
+      } else {
+        this.persistCurrentApartment();
+        writeSave(this.savedData);
+      }
+      return;
+    }
 
     for (const furniture of targets) {
       if (!furniture.userData.rotatable) continue;
@@ -2211,7 +2255,7 @@ export class BytPlannerApp {
           furniture.rotation.y = normalizeAngleRad(aligned + Math.PI);
         }
       } else {
-        furniture.rotation.y += step * FURNITURE_ROTATION_STEP;
+        furniture.rotation.y += delta;
       }
 
       if (isWallGapType(ud.furnitureType)) {
@@ -2219,7 +2263,7 @@ export class BytPlannerApp {
       }
     }
 
-    if (groupId && targets.length > 1) {
+    if (groupId && targets.length > 1 && groupMode === 'row') {
       snapFurnitureRow(targets);
       this.syncGroupOffsetsForMembers(targets);
     }

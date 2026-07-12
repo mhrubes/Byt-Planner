@@ -379,6 +379,13 @@ const FURNITURE_ITEMS = {
     color: '#7a5a10',
     accent: '#9a7020',
   },
+  dining_table_xl: {
+    label: 'Čtvercový jídelní stůl',
+    icon: '⬜',
+    size: { w: 2, h: 0.75, d: 2 },
+    color: '#6e5010',
+    accent: '#8a6018',
+  },
   chair: {
     label: 'Židle',
     icon: '💺',
@@ -503,7 +510,7 @@ export const CATALOG_CATEGORIES = [
     id: 'kitchen',
     label: 'Kuchyně & jídelna',
     icon: '🍳',
-    items: ['kitchen', 'kitchen_unit', 'kitchen_oven', 'kitchen_dishwasher', 'kitchen_hood', 'kitchen_fridge', 'dining_table_small', 'dining_table_medium', 'dining_table_large', 'chair'],
+    items: ['kitchen', 'kitchen_unit', 'kitchen_oven', 'kitchen_dishwasher', 'kitchen_hood', 'kitchen_fridge', 'dining_table_small', 'dining_table_medium', 'dining_table_large', 'dining_table_xl', 'chair'],
   },
   {
     id: 'office',
@@ -780,6 +787,7 @@ export function createFurnitureMesh(type, mode = 'preview', {
     case 'dining_table_small':
     case 'dining_table_medium':
     case 'dining_table_large':
+    case 'dining_table_xl':
       buildDiningTable(group, w, h, d, def, isArchitect);
       break;
     case 'toilet':
@@ -1273,6 +1281,7 @@ function buildDiningTable(group, w, h, d, def, architect) {
   const topY = h - topT * 0.5;
   const legH = h * 0.9;
   const compact = w < 1.05;
+  const wideTable = w >= 1.9 && w > d * 1.15;
 
   addBox(group, w, topT, d, 0, topY, 0, def.color, architect);
   addBox(group, w * 1.01, topT * 0.35, d * 1.01, 0, topY - topT * 0.32, 0, def.accent, architect);
@@ -1287,6 +1296,15 @@ function buildDiningTable(group, w, h, d, def, architect) {
     addBox(group, w * 0.88, topT * 0.45, 0.04, 0, legH + topT * 0.2, -d * 0.4, def.accent, architect);
     addBox(group, 0.04, topT * 0.45, d * 0.82, -w * 0.4, legH + topT * 0.2, 0, def.accent, architect);
     addBox(group, 0.04, topT * 0.45, d * 0.82, w * 0.4, legH + topT * 0.2, 0, def.accent, architect);
+
+    if (wideTable) {
+      const lw = 0.04;
+      for (const z of [-d * 0.36, d * 0.36]) {
+        addBox(group, lw, legH, lw, 0, legH * 0.5, z, def.accent, architect);
+      }
+      addBox(group, w * 0.94, topT * 0.4, 0.04, 0, legH + topT * 0.2, d * 0.38, def.accent, architect);
+      addBox(group, w * 0.94, topT * 0.4, 0.04, 0, legH + topT * 0.2, -d * 0.38, def.accent, architect);
+    }
   }
 }
 

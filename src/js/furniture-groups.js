@@ -80,24 +80,30 @@ export function getFurnitureById(furnitureGroup, furnitureId) {
   return furnitureGroup.children.find((f) => f.userData.furnitureId === furnitureId) ?? null;
 }
 
-export function canGroupFurnitureItems(items) {
-  if (items.length < 2) {
-    return { ok: false, reason: 'Vyber aspoň 2 položky (Ctrl+klik)' };
-  }
-
-  const blocked = items.filter((obj) => {
+function getBlockedGroupItems(items) {
+  return items.filter((obj) => {
     const type = obj.userData.furnitureType;
     return isCarpetType(type)
       || isWallGapType(type)
       || usesWallSnap(type, obj.userData.tvStyle);
   });
+}
+
+export function canGroupFurnitureItems(items, { mode = 'layout' } = {}) {
+  if (items.length < 2) {
+    return { ok: false, reason: 'Vyber aspoň 2 položky (Ctrl+klik)' };
+  }
+
+  const blocked = getBlockedGroupItems(items);
   if (blocked.length) {
     return { ok: false, reason: 'Dveře, okna, koberce a nábytek na zdi do skupiny nepatří' };
   }
 
-  const rot = items[0].rotation.y;
-  if (!items.every((obj) => rotationsMatch(obj.rotation.y, rot))) {
-    return { ok: false, reason: 'Všechny položky musí mít stejnou rotaci' };
+  if (mode === 'row') {
+    const rot = items[0].rotation.y;
+    if (!items.every((obj) => rotationsMatch(obj.rotation.y, rot))) {
+      return { ok: false, reason: 'Do řady lze seskupit jen položky se stejnou rotací' };
+    }
   }
 
   return { ok: true };
@@ -145,13 +151,36 @@ export function updateGroupOffsets(members, anchor) {
   }
 }
 
+export function pickGroupAnchor(members) {
+  if (members.length === 0) return null;
+  return [...members].sort((a, b) => {
+    if (a.position.x !== b.position.x) return a.position.x - b.position.x;
+    return a.position.z - b.position.z;
+  })[0];
+}
+
+export function assignFurnitureGroupLayout(members, groupId) {
+  const anchor = pickGroupAnchor(members);
+  for (const obj of members) {
+    obj.userData.furnitureGroupId = groupId;
+    obj.userData.groupMode = 'layout';
+  }
+  updateGroupOffsets(members, anchor);
+  return anchor;
+}
+
 export function assignFurnitureGroup(members, groupId, catalog = FURNITURE_CATALOG, gridSize = GRID_SIZE) {
   const anchor = snapFurnitureRow(members, catalog, gridSize);
   for (const obj of members) {
     obj.userData.furnitureGroupId = groupId;
+    obj.userData.groupMode = 'row';
   }
   updateGroupOffsets(members, anchor);
   return anchor;
+}
+
+export function assignFurnitureGroupRow(members, groupId, catalog = FURNITURE_CATALOG, gridSize = GRID_SIZE) {
+  return assignFurnitureGroup(members, groupId, catalog, gridSize);
 }
 
 export function clearFurnitureGroup(members) {
@@ -160,7 +189,27 @@ export function clearFurnitureGroup(members) {
     delete obj.userData.groupAnchorId;
     delete obj.userData.groupOffsetX;
     delete obj.userData.groupOffsetZ;
+    delete obj.userData.groupMode;
   }
+}
+
+export function rotateGroupLayout(members, anchor, deltaRad) {
+  const cos = Math.cos(deltaRad);
+  const sin = Math.sin(deltaRad);
+  const ax = anchor.position.x;
+  const az = anchor.position.z;
+
+  for (const obj of members) {
+    if (!obj.userData.rotatable) continue;
+    obj.rotation.y = normalizeAngleRad(obj.rotation.y + deltaRad);
+
+    const dx = obj.position.x - ax;
+    const dz = obj.position.z - az;
+    obj.position.x = ax + dx * cos - dz * sin;
+    obj.position.z = az + dx * sin + dz * cos;
+  }
+
+  updateGroupOffsets(members, anchor);
 }
 
 export function dissolvePartialGroups(furnitureGroup, affectedItems) {

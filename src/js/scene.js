@@ -582,6 +582,7 @@ export class SceneManager {
     groupAnchorId,
     groupOffsetX,
     groupOffsetZ,
+    groupMode,
   } = {}) {
     const mesh = createFurnitureMesh(type, this.mode, {
       furnitureId,
@@ -602,6 +603,7 @@ export class SceneManager {
       mesh.userData.groupAnchorId = groupAnchorId;
       mesh.userData.groupOffsetX = groupOffsetX ?? 0;
       mesh.userData.groupOffsetZ = groupOffsetZ ?? 0;
+      mesh.userData.groupMode = groupMode ?? 'layout';
     }
     if (isOpenableType(type)) {
       applyDoorOpenState(mesh, doorOpen);
@@ -629,6 +631,7 @@ export class SceneManager {
         item.groupAnchorId = f.userData.groupAnchorId;
         item.groupOffsetX = f.userData.groupOffsetX ?? 0;
         item.groupOffsetZ = f.userData.groupOffsetZ ?? 0;
+        item.groupMode = f.userData.groupMode ?? 'layout';
       }
       if (isOpenableType(item.type)) {
         item.doorOpen = !!f.userData.doorOpen;
@@ -669,6 +672,7 @@ export class SceneManager {
         groupAnchorId: item.groupAnchorId,
         groupOffsetX: item.groupOffsetX,
         groupOffsetZ: item.groupOffsetZ,
+        groupMode: item.groupMode,
       });
     }
     this.refreshWallOpenings();
