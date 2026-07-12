@@ -3,6 +3,23 @@ export const GRID_SIZE = 1;
 export const WALL_HEIGHT = 2.7;
 export const WALL_THICKNESS = 0.12;
 
+/** Obdélník koberec ze dvou rohů mřížky (jako kreslení zdi) */
+export function carpetRectFromGrid(start, end, gridSize = GRID_SIZE) {
+  const minX = Math.min(start.x, end.x);
+  const maxX = Math.max(start.x, end.x);
+  const minZ = Math.min(start.z, end.z);
+  const maxZ = Math.max(start.z, end.z);
+  const cellsW = maxX - minX + 1;
+  const cellsD = maxZ - minZ + 1;
+
+  return {
+    x: minX + (cellsW - 1) / 2,
+    z: minZ + (cellsD - 1) / 2,
+    sizeW: cellsW * gridSize,
+    sizeD: cellsD * gridSize,
+  };
+}
+
 /** Volný okraj kolem bytu pro budoucí rozšíření (v buňkách mřížky) */
 export const PLOT_PADDING = 8;
 

@@ -273,6 +273,22 @@ const FURNITURE_ITEMS = {
     color: '#4a5568',
     accent: '#718096',
   },
+  carpet: {
+    label: 'Koberec',
+    icon: '🟫',
+    size: { w: 1, h: 0.03, d: 1 },
+    color: '#6b4c34',
+    accent: '#c9a66b',
+    resizable: true,
+  },
+  bath_carpet: {
+    label: 'Koupelnový koberec',
+    icon: '🧶',
+    size: { w: 1, h: 0.022, d: 1 },
+    color: '#5a8a9a',
+    accent: '#e0f0f6',
+    resizable: true,
+  },
   desk: {
     label: 'Velký psací stůl',
     icon: '🖥️',
@@ -313,14 +329,34 @@ const FURNITURE_ITEMS = {
     icon: '🚰',
     size: { w: 0.65, h: 0.85, d: 0.45 },
     color: '#f5f5f5',
-    accent: '#c0c0c0',
+    accent: '#d8dce0',
+    inner: '#e8edf1',
   },
   bathtub: {
     label: 'Vana',
     icon: '🛁',
     size: { w: 1.7, h: 0.55, d: 0.75 },
     color: '#f5f5f5',
-    accent: '#e8e8e8',
+    accent: '#e8ecef',
+    inner: '#b8c8d4',
+  },
+  bath_shelf: {
+    label: 'Bambusová skříňka',
+    icon: '🧺',
+    size: { w: 0.72, h: 1.0, d: 0.34 },
+    color: '#c8a878',
+    accent: '#9a7048',
+    shelf: '#d8bc90',
+    towel: '#4a7a8c',
+  },
+  shower: {
+    label: 'Sprcha',
+    icon: '🚿',
+    size: { w: 0.9, h: 2.1, d: 0.9 },
+    color: '#f2f4f6',
+    accent: '#d0dce6',
+    glass: '#a8cce0',
+    tile: '#dce8f2',
   },
 };
 
@@ -339,7 +375,7 @@ export const CATALOG_CATEGORIES = [
     items: [
       'sofa', 'tv', 'table', 'bookshelf',
       'shelf_small', 'shelf_small_cabinet', 'shelf_medium', 'shelf_medium_cabinet', 'shelf_large', 'shelf_large_cabinet',
-      'plant', 'plant_medium', 'plant_large', 'lamp_small', 'lamp_medium', 'lamp',
+      'plant', 'plant_medium', 'plant_large', 'lamp_small', 'lamp_medium', 'lamp', 'carpet',
     ],
   },
   {
@@ -364,7 +400,7 @@ export const CATALOG_CATEGORIES = [
     id: 'bathroom',
     label: 'Koupelna',
     icon: '🛁',
-    items: ['toilet', 'sink', 'bathtub', 'radiator'],
+    items: ['toilet', 'sink', 'bathtub', 'bath_shelf', 'shower', 'radiator', 'bath_carpet'],
   },
 ];
 
@@ -380,10 +416,38 @@ export const SHELF_CABINET_TYPES = new Set([
 
 export const CABINET_TYPES = new Set([...SHELF_CABINET_TYPES, 'wardrobe']);
 
+export const CARPET_TYPES = new Set(['carpet', 'bath_carpet']);
+
+export const CARPET_SHAPES = {
+  rect: { label: 'Obdélník', icon: '▭' },
+  round: { label: 'Kulatý', icon: '●' },
+  oval: { label: 'Ovál', icon: '⬭' },
+  rounded: { label: 'Zaoblený', icon: '▢' },
+};
+
+export const CARPET_PATTERNS = {
+  plain: { label: 'Jednobarevný', icon: '◻', types: ['carpet', 'bath_carpet'] },
+  border: { label: 'Rámeček', icon: '▣', types: ['carpet', 'bath_carpet'] },
+  stripes: { label: 'Pruhy', icon: '≡', types: ['carpet', 'bath_carpet'] },
+  diamond: { label: 'Kosočtverce', icon: '◇', types: ['carpet'] },
+  shag: { label: 'Vlna', icon: '≋', types: ['carpet'] },
+  dots: { label: 'Tečky', icon: '∷', types: ['bath_carpet'] },
+};
+
+export const CARPET_STYLE_DEFAULTS = {
+  carpet: { shape: 'rect', pattern: 'border', color: '#6b4c34', accent: '#c9a66b' },
+  bath_carpet: { shape: 'rounded', pattern: 'dots', color: '#5a8a9a', accent: '#e0f0f6' },
+};
+
+export function getCarpetPatternsForType(type) {
+  return Object.entries(CARPET_PATTERNS).filter(([, meta]) => meta.types.includes(type));
+}
+
 export const OPENABLE_TYPES = new Set([
   'door',
   'balcony_door',
   'window',
+  'bath_shelf',
   ...CABINET_TYPES,
 ]);
 
@@ -403,23 +467,47 @@ export function isOpenableType(type) {
   return OPENABLE_TYPES.has(type);
 }
 
+export function isCarpetType(type) {
+  return CARPET_TYPES.has(type);
+}
+
 let furnitureIdCounter = 0;
 
-export function createFurnitureMesh(type, mode = 'preview') {
+export function createFurnitureMesh(type, mode = 'preview', {
+  sizeW,
+  sizeD,
+  carpetShape,
+  carpetPattern,
+  carpetColor,
+  carpetAccent,
+} = {}) {
   const def = FURNITURE_ITEMS[type];
   if (!def) return null;
+
+  const styleDefaults = CARPET_STYLE_DEFAULTS[type] ?? {};
 
   const group = new THREE.Group();
   group.userData = {
     isFurniture: true,
     furnitureType: type,
     furnitureId: `f-${++furnitureIdCounter}`,
-    rotatable: true,
+    rotatable: !isCarpetType(type),
     doorOpen: false,
   };
 
-  const { w, h, d } = def.size;
+  const w = sizeW ?? def.size.w;
+  const h = def.size.h;
+  const d = sizeD ?? def.size.d;
   const isArchitect = mode === 'architect';
+
+  if (isCarpetType(type)) {
+    group.userData.sizeW = w;
+    group.userData.sizeD = d;
+    group.userData.carpetShape = carpetShape ?? styleDefaults.shape ?? 'rect';
+    group.userData.carpetPattern = carpetPattern ?? styleDefaults.pattern ?? 'plain';
+    group.userData.carpetColor = carpetColor ?? styleDefaults.color ?? def.color;
+    group.userData.carpetAccent = carpetAccent ?? styleDefaults.accent ?? def.accent;
+  }
 
   switch (type) {
     case 'door':
@@ -517,6 +605,16 @@ export function createFurnitureMesh(type, mode = 'preview') {
       break;
     case 'bathtub':
       buildBathtub(group, w, h, d, def, isArchitect);
+      break;
+    case 'bath_shelf':
+      buildBathShelf(group, w, h, d, def, isArchitect);
+      break;
+    case 'shower':
+      buildShower(group, w, h, d, def, isArchitect);
+      break;
+    case 'carpet':
+    case 'bath_carpet':
+      buildCarpet(group, w, h, d, def, isArchitect);
       break;
     default:
       addBox(group, w, h, d, 0, h * 0.5, 0, def.color, isArchitect);
@@ -1320,14 +1418,32 @@ function buildWindow(group, w, h, d, def, architect) {
 }
 
 function buildRadiator(group, w, h, d, def, architect) {
-  const ribCount = 8;
-  const ribW = w / (ribCount * 2);
-  for (let i = 0; i < ribCount; i++) {
-    const x = -w * 0.5 + ribW + i * ribW * 2;
-    addBox(group, ribW * 0.7, h * 0.85, d, x, h * 0.5, 0, def.color, architect);
+  const depth = Math.max(d, 0.08) * 1.2;
+  const sections = 3;
+  const sectionW = (w - 0.1) / sections;
+  const gap = 0.02;
+
+  addBox(group, w * 0.88, 0.028, 0.03, 0, h * 0.5, -depth * 0.55, '#9aa0a6', architect);
+  addBox(group, 0.028, h * 0.32, 0.035, -w * 0.34, h * 0.56, -depth * 0.38, '#8a9098', architect);
+  addBox(group, 0.028, h * 0.32, 0.035, w * 0.34, h * 0.56, -depth * 0.38, '#8a9098', architect);
+
+  addBox(group, w, h * 0.075, depth, 0, h * 0.965, depth * 0.05, def.accent, architect);
+  addBox(group, w, h * 0.075, depth, 0, h * 0.045, depth * 0.05, def.accent, architect);
+
+  for (let i = 0; i < sections; i++) {
+    const x = -w / 2 + 0.05 + sectionW / 2 + i * (sectionW + gap);
+    addBox(group, sectionW, h * 0.8, depth * 0.9, x, h * 0.52, depth * 0.05, def.color, architect);
+
+    const fins = 6;
+    for (let f = 0; f < fins; f++) {
+      const fx = x - sectionW / 2 + (sectionW / (fins + 1)) * (f + 1);
+      addBox(group, 0.014, h * 0.76, depth * 0.82, fx, h * 0.51, depth * 0.06, '#fafafa', architect);
+    }
   }
-  addBox(group, w, h * 0.08, d * 1.2, 0, h * 0.96, 0, def.accent, architect);
-  addBox(group, w, h * 0.08, d * 1.2, 0, h * 0.04, 0, def.accent, architect);
+
+  addCylinder(group, 0.038, 0.09, '#b8bcc0', architect, { x: w * 0.4, y: h * 0.14, z: depth * 0.55 });
+  addCylinder(group, 0.024, 0.055, '#e4e6e8', architect, { x: w * 0.4, y: h * 0.23, z: depth * 0.62 });
+  addBox(group, 0.05, 0.04, 0.04, w * 0.4, h * 0.28, depth * 0.68, '#d0d4d8', architect);
 }
 
 function buildLampSmall(group, w, h, d, def, architect) {
@@ -1367,19 +1483,578 @@ function buildToilet(group, w, h, d, def, architect) {
 }
 
 function buildSink(group, w, h, d, def, architect) {
-  addBox(group, w, h * 0.75, d * 0.5, 0, h * 0.375, 0, def.color, architect);
-  addBox(group, w * 0.85, h * 0.08, d * 0.7, 0, h * 0.78, 0, def.accent, architect);
-  addBox(group, w * 0.55, h * 0.12, d * 0.45, 0, h * 0.84, d * 0.05, '#d0e8f8', architect, { isGlass: true });
-  addBox(group, 0.04, h * 0.25, 0.04, w * 0.35, h * 0.88, d * 0.25, '#c0c0c0', architect);
+  const inner = def.inner ?? '#c5d0da';
+  const innerDark = '#a8b8c4';
+
+  addBox(group, w * 0.94, h * 0.66, d * 0.54, 0, h * 0.33, 0, def.color, architect);
+  addBox(group, 0.012, h * 0.48, d * 0.55, 0, h * 0.36, 0, def.accent, architect);
+  addBox(group, w * 0.72, 0.018, 0.012, 0, h * 0.6, d * 0.275, def.accent, architect);
+  addBox(group, w * 0.22, 0.018, 0.012, -w * 0.24, h * 0.6, d * 0.275, '#c8ccd0', architect);
+
+  const counterY = h * 0.755;
+  const counterThick = h * 0.055;
+  const counterD = d * 0.82;
+  const holeW = w * 0.52;
+  const holeD = d * 0.36;
+  const holeZ = d * 0.04;
+  const sideW = (w - holeW) / 2;
+  const frontStripD = counterD / 2 - holeZ - holeD / 2;
+  const backStripD = counterD / 2 + holeZ - holeD / 2;
+
+  if (frontStripD > 0.02) {
+    addBox(group, w, counterThick, frontStripD, 0, counterY, -counterD / 2 + frontStripD / 2, def.accent, architect);
+  }
+  if (backStripD > 0.02) {
+    addBox(group, w, counterThick, backStripD, 0, counterY, counterD / 2 - backStripD / 2, def.accent, architect);
+  }
+  addBox(group, sideW, counterThick, holeD, -w / 2 + sideW / 2, counterY, holeZ, def.accent, architect);
+  addBox(group, sideW, counterThick, holeD, w / 2 - sideW / 2, counterY, holeZ, def.accent, architect);
+
+  const basinDepth = h * 0.2;
+  const basinTop = counterY - counterThick / 2;
+  const basinFloorY = basinTop - basinDepth;
+
+  addBox(group, holeW * 0.94, 0.025, holeD * 0.94, 0, basinFloorY, holeZ, innerDark, architect);
+  addCylinder(group, 0.02, 0.015, '#8a98a4', architect, { x: 0, y: basinFloorY + 0.014, z: holeZ });
+
+  const wallH = basinDepth * 0.92;
+  const wallCenterY = basinFloorY + wallH / 2;
+  addBox(group, 0.035, wallH, holeD * 0.92, -holeW / 2 + 0.02, wallCenterY, holeZ, inner, architect);
+  addBox(group, 0.035, wallH, holeD * 0.92, holeW / 2 - 0.02, wallCenterY, holeZ, inner, architect);
+  addBox(group, holeW * 0.92, wallH, 0.035, 0, wallCenterY, holeZ - holeD / 2 + 0.02, inner, architect);
+  addBox(group, holeW * 0.92, wallH * 0.65, 0.035, 0, wallCenterY - wallH * 0.12, holeZ + holeD / 2 - 0.02, inner, architect);
+
+  addCylinder(group, 0.022, h * 0.065, '#b0b6bc', architect, {
+    x: 0,
+    y: counterY + h * 0.1,
+    z: holeZ - holeD * 0.38,
+  });
+  addBox(group, 0.15, 0.028, 0.028, 0, counterY + h * 0.135, holeZ - holeD * 0.46, '#a4aab0', architect);
+  addCylinder(group, 0.016, 0.038, '#c0c6cc', architect, {
+    x: 0,
+    y: counterY + h * 0.085,
+    z: holeZ - holeD * 0.4,
+  });
+  addBox(group, 0.032, 0.065, 0.022, w * 0.14, counterY + h * 0.085, holeZ - holeD * 0.2, '#c8ccd2', architect);
 }
 
 function buildBathtub(group, w, h, d, def, architect) {
-  addBox(group, w, h * 0.55, d, 0, h * 0.3, 0, def.color, architect);
-  addBox(group, w * 0.88, h * 0.35, d * 0.82, 0, h * 0.45, 0, '#d8eef8', architect, { isGlass: true });
-  addBox(group, w, h * 0.12, d * 0.08, 0, h * 0.56, -d * 0.46, def.accent, architect);
+  const inner = def.inner ?? '#b8c8d4';
+  const innerDark = '#9aabb8';
+  const wallT = 0.07;
+  const rimH = h * 0.12;
+  const bodyH = h * 0.88;
+  const baseY = 0.05;
+  const innerW = w - wallT * 2;
+  const innerD = d - wallT * 2;
+  const openW = innerW * 0.96;
+  const openD = innerD * 0.96;
+
+  const feet = [
+    [-w * 0.36, -d * 0.34],
+    [w * 0.36, -d * 0.34],
+    [-w * 0.36, d * 0.34],
+    [w * 0.36, d * 0.34],
+  ];
+  for (const [fx, fz] of feet) {
+    addCylinder(group, 0.038, baseY * 1.6, def.accent, architect, { x: fx, y: baseY * 0.8, z: fz });
+  }
+
+  addBox(group, w, wallT, d, 0, baseY + wallT / 2, 0, def.color, architect);
+
+  const wallHeight = bodyH - rimH;
+  const wallCenterY = baseY + wallT + wallHeight / 2;
+  addBox(group, wallT, wallHeight, d, -w / 2 + wallT / 2, wallCenterY, 0, def.color, architect);
+  addBox(group, wallT, wallHeight, d, w / 2 - wallT / 2, wallCenterY, 0, def.color, architect);
+  addBox(group, w, wallHeight, wallT, 0, wallCenterY, -d / 2 + wallT / 2, def.color, architect);
+  addBox(group, w, wallHeight, wallT, 0, wallCenterY, d / 2 - wallT / 2, def.color, architect);
+
+  const rimY = baseY + bodyH - rimH / 2;
+  const lipT = wallT * 1.1;
+  addBox(group, w + 0.04, rimH, lipT, 0, rimY, -d / 2 + lipT / 2, def.accent, architect);
+  addBox(group, w + 0.04, rimH, lipT, 0, rimY, d / 2 - lipT / 2, def.accent, architect);
+  addBox(group, lipT, rimH, d + 0.04, -w / 2 + lipT / 2, rimY, 0, def.accent, architect);
+  addBox(group, lipT, rimH, d + 0.04, w / 2 - lipT / 2, rimY, 0, def.accent, architect);
+
+  const cavityFloorY = baseY + wallT + 0.02;
+  const cavityDepth = bodyH - rimH - wallT * 0.5;
+  addBox(group, openW * 0.92, 0.03, openD * 0.92, 0, cavityFloorY, 0, innerDark, architect);
+  addCylinder(group, 0.04, 0.02, '#7a8a96', architect, { x: 0, y: cavityFloorY + 0.015, z: 0 });
+
+  const innerWallH = cavityDepth * 0.88;
+  const innerWallY = cavityFloorY + innerWallH / 2;
+  addBox(group, 0.045, innerWallH, openD * 0.94, -openW / 2 + 0.025, innerWallY, 0, inner, architect);
+  addBox(group, 0.045, innerWallH, openD * 0.94, openW / 2 - 0.025, innerWallY, 0, inner, architect);
+  addBox(group, openW * 0.94, innerWallH, 0.045, 0, innerWallY, -openD / 2 + 0.025, inner, architect);
+  addBox(group, openW * 0.94, innerWallH * 0.7, 0.045, 0, innerWallY - innerWallH * 0.1, openD / 2 - 0.025, inner, architect);
+
+  addBox(group, 0.1, 0.2, 0.1, 0, baseY + bodyH + 0.04, -d / 2 + 0.08, '#b4bac0', architect);
+  addCylinder(group, 0.028, 0.16, '#a0a8b0', architect, { x: 0, y: baseY + bodyH + 0.14, z: -d / 2 + 0.12 });
+  addBox(group, 0.14, 0.035, 0.05, 0, baseY + bodyH + 0.24, -d / 2 + 0.1, '#c0c6cc', architect);
 }
 
-function makeMaterial(color, architect, { isGlass = false, emissive = null, keepColor = false, doubleSided = false } = {}) {
+function addLouveredDoorPanel(pivot, panelW, doorH, doorT, color, frameColor, architect, hingeSide) {
+  const slats = 9;
+  const gap = 0.007;
+  const slatH = (doorH - gap * (slats + 1)) / slats;
+  const centerX = hingeSide * panelW * 0.5;
+
+  for (let i = 0; i < slats; i++) {
+    const y = -doorH / 2 + gap + slatH / 2 + i * (slatH + gap);
+    addBox(pivot, panelW * 0.9, slatH, doorT, centerX, y, 0, color, architect, {
+      partRole: 'cabinet-door',
+      doubleSided: true,
+    });
+  }
+
+  addBox(pivot, 0.022, doorH, doorT * 1.05, centerX - hingeSide * panelW * 0.44, 0, 0, frameColor, architect, {
+    partRole: 'cabinet-door',
+    doubleSided: true,
+  });
+  addBox(pivot, 0.022, doorH, doorT * 1.05, centerX + hingeSide * panelW * 0.44, 0, 0, frameColor, architect, {
+    partRole: 'cabinet-door',
+    doubleSided: true,
+  });
+  addBox(pivot, panelW * 0.9, 0.022, doorT * 1.05, centerX, doorH / 2 - 0.011, 0, frameColor, architect, {
+    partRole: 'cabinet-door',
+    doubleSided: true,
+  });
+  addBox(pivot, panelW * 0.9, 0.022, doorT * 1.05, centerX, -doorH / 2 + 0.011, 0, frameColor, architect, {
+    partRole: 'cabinet-door',
+    doubleSided: true,
+  });
+
+  const notchX = centerX - hingeSide * panelW * 0.32;
+  addBox(pivot, 0.028, 0.09, doorT * 0.7, notchX, 0, doorT * 0.35, frameColor, architect, {
+    partRole: 'cabinet-handle',
+    doubleSided: true,
+  });
+}
+
+function addBathShelfDoors(group, w, cabinetH, d, baseY, def, architect, wood, woodDark) {
+  const side = 0.028;
+  const innerW = w - side * 2;
+  const doorH = cabinetH - side * 1.4;
+  const doorT = 0.016;
+  const frontZ = d * 0.5 - doorT * 0.5;
+  const pivotY = baseY + cabinetH / 2;
+  const panelW = (innerW - 0.018) * 0.5;
+
+  const leftPivot = new THREE.Group();
+  leftPivot.position.set(-w / 2 + side, pivotY, frontZ);
+  leftPivot.userData.partRole = 'cabinet-door-left-pivot';
+  group.add(leftPivot);
+  addLouveredDoorPanel(leftPivot, panelW, doorH, doorT, wood, woodDark, architect, 1);
+
+  const rightPivot = new THREE.Group();
+  rightPivot.position.set(w / 2 - side, pivotY, frontZ);
+  rightPivot.userData.partRole = 'cabinet-door-right-pivot';
+  group.add(rightPivot);
+  addLouveredDoorPanel(rightPivot, panelW, doorH, doorT, wood, woodDark, architect, -1);
+}
+
+function buildBathShelf(group, w, h, d, def, architect) {
+  const wood = def.color ?? '#c8a878';
+  const woodDark = def.accent ?? '#9a7048';
+  const woodLight = def.shelf ?? '#d8bc90';
+  const towel = def.towel ?? '#4a7a8c';
+
+  const legH = h * 0.06;
+  const cabinetH = h * 0.5;
+  const gapH = h * 0.2;
+  const topThick = h * 0.035;
+  const cabinetBaseY = legH;
+  const cabinetCY = cabinetBaseY + cabinetH / 2;
+  const topY = legH + cabinetH + gapH + topThick / 2;
+
+  const legPositions = [
+    [-w * 0.4, legH * 0.5, -d * 0.38],
+    [w * 0.4, legH * 0.5, -d * 0.38],
+    [-w * 0.4, legH * 0.5, d * 0.38],
+    [w * 0.4, legH * 0.5, d * 0.38],
+  ];
+  for (const [lx, ly, lz] of legPositions) {
+    addBox(group, 0.045, legH, 0.045, lx, ly, lz, woodDark, architect);
+  }
+
+  const side = 0.028;
+  const innerW = w - side * 2;
+  const innerD = d - side * 1.15;
+
+  addBox(group, w, 0.022, d, 0, cabinetBaseY + 0.011, 0, woodDark, architect);
+  addBox(group, side, cabinetH, d, -w / 2 + side / 2, cabinetCY, 0, wood, architect);
+  addBox(group, side, cabinetH, d, w / 2 - side / 2, cabinetCY, 0, wood, architect);
+  addBox(group, innerW, cabinetH, side * 0.75, 0, cabinetCY, -d / 2 + side * 0.38, wood, architect);
+  addBox(group, innerW, 0.016, innerD, 0, cabinetBaseY + cabinetH * 0.5, 0, woodLight, architect);
+
+  for (const compartmentX of [-innerW * 0.25, innerW * 0.25]) {
+    for (let s = 0; s < 2; s++) {
+      const shelfY = cabinetBaseY + cabinetH * (0.28 + s * 0.28);
+      for (let i = 0; i < 5; i++) {
+        const slatZ = -innerD * 0.35 + i * (innerD * 0.7) / 4;
+        addBox(group, innerW * 0.34, 0.01, 0.018, compartmentX, shelfY, slatZ, woodLight, architect);
+      }
+    }
+    addBox(group, innerW * 0.3, cabinetH * 0.07, innerD * 0.65, compartmentX, cabinetBaseY + cabinetH * 0.26, 0, towel, architect);
+    addBox(group, innerW * 0.1, 0.014, innerD * 0.6, compartmentX, cabinetBaseY + cabinetH * 0.32, 0, '#6a9aaa', architect);
+    addBox(group, innerW * 0.28, cabinetH * 0.06, innerD * 0.6, compartmentX, cabinetBaseY + cabinetH * 0.72, 0, '#5a8a9a', architect);
+  }
+
+  addBathShelfDoors(group, w, cabinetH, d, cabinetBaseY, def, architect, wood, woodDark);
+
+  const postH = gapH + topThick;
+  const postY = legH + cabinetH + postH / 2;
+  const corners = [
+    [-w / 2 + side, -d / 2 + side],
+    [w / 2 - side, -d / 2 + side],
+    [-w / 2 + side, d / 2 - side],
+    [w / 2 - side, d / 2 - side],
+  ];
+  for (const [px, pz] of corners) {
+    addBox(group, side * 0.85, postH, side * 0.85, px, postY, pz, wood, architect);
+  }
+
+  addBox(group, w, topThick, d, 0, topY, 0, woodLight, architect);
+
+  const surfaceY = topY + topThick / 2;
+  const bottles = [
+    { x: -w * 0.28, z: d * 0.04, color: '#e8f0f8', ht: h * 0.13 },
+    { x: -w * 0.06, z: -d * 0.06, color: '#d0e8f0', ht: h * 0.11 },
+    { x: w * 0.14, z: d * 0.06, color: '#f0e8d0', ht: h * 0.14 },
+    { x: w * 0.32, z: -d * 0.02, color: '#e0f0e8', ht: h * 0.1 },
+  ];
+  for (const b of bottles) {
+    addCylinder(group, 0.026, b.ht, b.color, architect, { x: b.x, y: surfaceY + b.ht / 2, z: b.z });
+    addBox(group, 0.018, 0.03, 0.018, b.x, surfaceY + b.ht + 0.012, b.z, '#c0c4c8', architect);
+  }
+
+  addBox(group, w * 0.16, h * 0.035, d * 0.22, w * 0.02, surfaceY + h * 0.018, d * 0.1, '#f8f4ec', architect);
+  addBox(group, w * 0.12, h * 0.028, d * 0.18, -w * 0.34, surfaceY + h * 0.014, -d * 0.08, '#fff8f0', architect);
+  addBox(group, w * 0.08, h * 0.05, d * 0.1, -w * 0.12, surfaceY + h * 0.025, d * 0.12, '#e8eef4', architect);
+}
+
+function buildShower(group, w, h, d, def, architect) {
+  const glass = def.glass ?? '#a8cce0';
+  const tile = def.tile ?? '#dce8f2';
+  const trayH = 0.075;
+  const rimH = 0.045;
+  const glassOpts = { isGlass: true, keepColor: !architect };
+
+  addBox(group, w, trayH, d, 0, trayH / 2, 0, def.accent, architect);
+  addBox(group, w, rimH, 0.055, 0, trayH + rimH / 2, d / 2 - 0.02, def.color, architect);
+  addBox(group, w, rimH, 0.055, 0, trayH + rimH / 2, -d / 2 + 0.02, def.color, architect);
+  addBox(group, 0.055, rimH, d, -w / 2 + 0.028, trayH + rimH / 2, 0, def.color, architect);
+  addBox(group, 0.055, rimH, d, w / 2 - 0.028, trayH + rimH / 2, 0, def.color, architect);
+  addCylinder(group, 0.042, 0.018, '#98a4ac', architect, { x: 0, y: trayH + 0.012, z: 0 });
+
+  addBox(group, w * 0.96, h * 0.9, 0.038, 0, h * 0.5, -d / 2 + 0.02, tile, architect);
+  for (let row = 0; row < 7; row++) {
+    addBox(group, w * 0.88, 0.008, 0.006, 0, trayH + 0.22 + row * h * 0.11, -d / 2 + 0.045, '#ccd8e4', architect);
+  }
+
+  addBox(group, 0.02, h * 0.84, d * 0.9, -w / 2 + 0.012, h * 0.47, 0, glass, architect, glassOpts);
+  addBox(group, 0.02, h * 0.84, d * 0.9, w / 2 - 0.012, h * 0.47, 0, glass, architect, glassOpts);
+  addBox(group, w * 0.58, h * 0.48, 0.02, 0, h * 0.3, d / 2 - 0.012, glass, architect, glassOpts);
+
+  addBox(group, 0.038, h * 0.86, 0.038, w * 0.3, h * 0.5, -d * 0.38, '#a8b0b8', architect);
+  addBox(group, 0.2, 0.032, 0.032, w * 0.2, h * 0.9, -d * 0.38, '#a8b0b8', architect);
+  addCylinder(group, 0.11, 0.028, '#e4e8ec', architect, { x: w * 0.12, y: h * 0.93, z: -d * 0.38 });
+  addCylinder(group, 0.075, 0.018, '#c8ccd2', architect, { x: w * 0.12, y: h * 0.95, z: -d * 0.38 });
+
+  addBox(group, 0.11, 0.15, 0.075, -w * 0.28, h * 0.52, -d / 2 + 0.06, '#bcc4cc', architect);
+  addCylinder(group, 0.032, 0.055, '#e0e4e8', architect, { x: -w * 0.28, y: h * 0.61, z: -d / 2 + 0.1 });
+  addBox(group, 0.045, 0.07, 0.045, -w * 0.18, h * 0.47, -d / 2 + 0.055, '#a0a8b0', architect);
+  addBox(group, 0.035, h * 0.12, 0.035, -w * 0.18, h * 0.4, -d / 2 + 0.055, '#b0b8c0', architect);
+}
+
+function buildCarpet(group, w, h, d, def, architect, opts = {}) {
+  const shape = opts.shape ?? group.userData?.carpetShape ?? 'rect';
+  const pattern = opts.pattern ?? group.userData?.carpetPattern ?? 'border';
+  const color = opts.color ?? group.userData?.carpetColor ?? def.color;
+  const accent = opts.accent ?? group.userData?.carpetAccent ?? def.accent;
+
+  buildCarpetBase(group, shape, w, h, d, color, architect);
+  buildCarpetPattern(group, shape, pattern, w, h, d, color, accent, architect);
+  buildCarpetEdge(group, shape, w, h, d, color, accent, architect);
+}
+
+function buildCarpetBase(group, shape, w, h, d, color, architect) {
+  if (shape === 'round' || shape === 'oval') {
+    const radius = Math.min(w, d) / 2;
+    const geo = new THREE.CylinderGeometry(radius, radius * 0.98, h, 48);
+    const mesh = new THREE.Mesh(geo, makeMaterial(color, architect, { roughness: 0.92 }));
+    mesh.position.y = h / 2;
+    if (shape === 'oval') {
+      mesh.scale.set(w / (2 * radius), 1, d / (2 * radius));
+    }
+    mesh.castShadow = !architect;
+    mesh.receiveShadow = !architect;
+    mesh.userData.isFurniturePart = true;
+    mesh.userData.partColor = color;
+    group.add(mesh);
+    return;
+  }
+
+  if (shape === 'rounded') {
+    const corner = Math.min(w, d) * 0.14;
+    const innerW = Math.max(w - corner * 2, w * 0.55);
+    const innerD = Math.max(d - corner * 2, d * 0.55);
+    addBox(group, innerW, h, d, 0, h / 2, 0, color, architect);
+    addBox(group, w, h, innerD, 0, h / 2, 0, color, architect);
+    const corners = [
+      [w / 2 - corner, d / 2 - corner],
+      [-w / 2 + corner, d / 2 - corner],
+      [w / 2 - corner, -d / 2 + corner],
+      [-w / 2 + corner, -d / 2 + corner],
+    ];
+    for (const [cx, cz] of corners) {
+      const geo = new THREE.CylinderGeometry(corner, corner, h, 16);
+      const mesh = new THREE.Mesh(geo, makeMaterial(color, architect, { roughness: 0.92 }));
+      mesh.position.set(cx, h / 2, cz);
+      mesh.castShadow = !architect;
+      mesh.receiveShadow = !architect;
+      mesh.userData.isFurniturePart = true;
+      mesh.userData.partColor = color;
+      group.add(mesh);
+    }
+    return;
+  }
+
+  addBox(group, w, h, d, 0, h / 2, 0, color, architect);
+}
+
+function carpetPointInside(shape, w, d, px, pz) {
+  if (shape === 'round') {
+    const r = Math.min(w, d) / 2;
+    return px * px + pz * pz <= r * r * 0.92;
+  }
+  if (shape === 'oval') {
+    const rx = w / 2;
+    const rz = d / 2;
+    return (px * px) / (rx * rx) + (pz * pz) / (rz * rz) <= 0.92;
+  }
+  const marginX = w * 0.06;
+  const marginZ = d * 0.06;
+  return Math.abs(px) <= w / 2 - marginX && Math.abs(pz) <= d / 2 - marginZ;
+}
+
+function buildCarpetPattern(group, shape, pattern, w, h, d, color, accent, architect) {
+  const layerY = h * 0.62;
+  const layerH = h * 0.22;
+
+  if (pattern === 'plain') {
+    const weaveCount = Math.max(3, Math.floor(Math.max(w, d) * 2));
+    for (let i = 0; i < weaveCount; i++) {
+      const t = (i + 0.5) / weaveCount - 0.5;
+      const stripeW = Math.max(w, d) / weaveCount * 0.55;
+      if (i % 2 === 0) {
+        addBox(group, w * 0.9, layerH * 0.35, stripeW, 0, layerY, t * d * 0.82, accent, architect);
+      } else {
+        addBox(group, stripeW, layerH * 0.35, d * 0.9, t * w * 0.82, layerY, 0, accent, architect);
+      }
+    }
+    return;
+  }
+
+  if (pattern === 'border') {
+    if (shape === 'round' || shape === 'oval') {
+      const outerR = Math.min(w, d) / 2;
+      const innerR = outerR * 0.72;
+      const ring = new THREE.RingGeometry(innerR * 0.92, outerR * 0.96, 48);
+      const mesh = new THREE.Mesh(ring, makeMaterial(accent, architect));
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.position.y = layerY;
+      if (shape === 'oval') {
+        mesh.scale.set(w / (2 * outerR), d / (2 * outerR), 1);
+      }
+      mesh.castShadow = false;
+      mesh.userData.isFurniturePart = true;
+      mesh.userData.partColor = accent;
+      group.add(mesh);
+
+      const center = new THREE.CircleGeometry(innerR * 0.88, 48);
+      const centerMesh = new THREE.Mesh(center, makeMaterial(accent, architect, { roughness: 0.88 }));
+      centerMesh.rotation.x = -Math.PI / 2;
+      centerMesh.position.y = layerY + layerH * 0.15;
+      if (shape === 'oval') {
+        centerMesh.scale.set(w / (2 * outerR), d / (2 * outerR), 1);
+      }
+      centerMesh.userData.isFurniturePart = true;
+      centerMesh.userData.partColor = accent;
+      group.add(centerMesh);
+      return;
+    }
+
+    const insetW = w * 0.72;
+    const insetD = d * 0.72;
+    if (shape === 'rounded') {
+      const corner = Math.min(insetW, insetD) * 0.14;
+      const innerW = Math.max(insetW - corner * 2, insetW * 0.55);
+      const innerD = Math.max(insetD - corner * 2, insetD * 0.55);
+      addBox(group, innerW, layerH, insetD, 0, layerY, 0, accent, architect);
+      addBox(group, insetW, layerH, innerD, 0, layerY, 0, accent, architect);
+      const corners = [
+        [insetW / 2 - corner, insetD / 2 - corner],
+        [-insetW / 2 + corner, insetD / 2 - corner],
+        [insetW / 2 - corner, -insetD / 2 + corner],
+        [-insetW / 2 + corner, -insetD / 2 + corner],
+      ];
+      for (const [cx, cz] of corners) {
+        const geo = new THREE.CylinderGeometry(corner, corner, layerH, 12);
+        const mesh = new THREE.Mesh(geo, makeMaterial(accent, architect));
+        mesh.position.set(cx, layerY, cz);
+        mesh.userData.isFurniturePart = true;
+        mesh.userData.partColor = accent;
+        group.add(mesh);
+      }
+    } else {
+      addBox(group, insetW, layerH, insetD, 0, layerY, 0, accent, architect);
+    }
+    return;
+  }
+
+  if (pattern === 'stripes') {
+    const stripes = Math.max(4, Math.floor(w * 2.5));
+    const stripeW = (w * 0.86) / stripes;
+    for (let i = 0; i < stripes; i++) {
+      const px = -w * 0.43 + stripeW * (i + 0.5);
+      const stripeColor = i % 2 === 0 ? accent : color;
+      if (!carpetPointInside(shape, w, d, px, 0)) continue;
+      if (shape === 'round' || shape === 'oval') {
+        const span = Math.sqrt(Math.max(0, 1 - (px / (w / 2)) ** 2)) * d * 0.82;
+        addBox(group, stripeW * 0.82, layerH, span, px, layerY, 0, stripeColor, architect);
+      } else {
+        addBox(group, stripeW * 0.82, layerH, d * 0.86, px, layerY, 0, stripeColor, architect);
+      }
+    }
+    return;
+  }
+
+  if (pattern === 'diamond') {
+    const cell = Math.min(w, d) / 5.5;
+    const cols = Math.ceil(w / cell);
+    const rows = Math.ceil(d / cell);
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        const px = -w / 2 + cell * (col + 0.5);
+        const pz = -d / 2 + cell * (row + 0.5);
+        if (!carpetPointInside(shape, w, d, px, pz)) continue;
+        const tileColor = (row + col) % 2 === 0 ? accent : color;
+        const geo = new THREE.BoxGeometry(cell * 0.55, layerH, cell * 0.55);
+        const mesh = new THREE.Mesh(geo, makeMaterial(tileColor, architect));
+        mesh.position.set(px, layerY, pz);
+        mesh.rotation.y = Math.PI / 4;
+        mesh.userData.isFurniturePart = true;
+        mesh.userData.partColor = tileColor;
+        group.add(mesh);
+      }
+    }
+    return;
+  }
+
+  if (pattern === 'shag') {
+    const count = Math.floor(w * d * 10);
+    for (let i = 0; i < count; i++) {
+      const px = ((i * 19) % 100) / 100 - 0.5;
+      const pz = ((i * 37) % 100) / 100 - 0.5;
+      const x = px * w * 0.82;
+      const z = pz * d * 0.82;
+      if (!carpetPointInside(shape, w, d, x, z)) continue;
+      const bumpH = h * (0.55 + (i % 4) * 0.18);
+      const bumpColor = i % 3 === 0 ? accent : color;
+      addBox(group, 0.035, bumpH, 0.035, x, h + bumpH / 2, z, bumpColor, architect);
+    }
+    return;
+  }
+
+  if (pattern === 'dots') {
+    const spacing = Math.min(w, d) / 4.5;
+    const cols = Math.ceil(w / spacing);
+    const rows = Math.ceil(d / spacing);
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        const px = -w / 2 + spacing * (col + 0.5);
+        const pz = -d / 2 + spacing * (row + 0.5);
+        if (!carpetPointInside(shape, w, d, px, pz)) continue;
+        const dotColor = (row + col) % 2 === 0 ? accent : '#ffffff';
+        addSphere(group, spacing * 0.14, layerY + layerH * 0.35, dotColor, architect, { x: px, z: pz });
+      }
+    }
+  }
+}
+
+function buildCarpetEdge(group, shape, w, h, d, color, accent, architect) {
+  const fringeH = h * 1.8;
+  const fringeW = Math.min(0.03, Math.min(w, d) * 0.04);
+
+  if (shape === 'round' || shape === 'oval') {
+    const radius = Math.min(w, d) / 2;
+    const geo = new THREE.TorusGeometry(radius * 0.97, fringeW * 0.65, 8, 48);
+    const mesh = new THREE.Mesh(geo, makeMaterial(accent, architect));
+    mesh.rotation.x = Math.PI / 2;
+    mesh.position.y = h * 0.55;
+    if (shape === 'oval') {
+      mesh.scale.set(w / (2 * radius), 1, d / (2 * radius));
+    }
+    mesh.userData.isFurniturePart = true;
+    mesh.userData.partColor = accent;
+    group.add(mesh);
+    return;
+  }
+
+  const tasselCount = Math.max(4, Math.floor(w * 1.8));
+  const step = w / tasselCount;
+  for (let i = 0; i < tasselCount; i++) {
+    const x = -w / 2 + step * (i + 0.5);
+    addBox(group, fringeW, fringeH, fringeW * 1.4, x, fringeH / 2, d / 2 - fringeW, accent, architect);
+    addBox(group, fringeW, fringeH, fringeW * 1.4, x, fringeH / 2, -d / 2 + fringeW, accent, architect);
+  }
+
+  if (shape === 'rect') {
+    const sideCount = Math.max(3, Math.floor(d * 1.2));
+    const sideStep = d / sideCount;
+    for (let i = 0; i < sideCount; i++) {
+      const z = -d / 2 + sideStep * (i + 0.5);
+      addBox(group, fringeW * 1.4, fringeH * 0.85, fringeW, w / 2 - fringeW, fringeH * 0.42, z, color, architect);
+      addBox(group, fringeW * 1.4, fringeH * 0.85, fringeW, -w / 2 + fringeW, fringeH * 0.42, z, color, architect);
+    }
+  }
+}
+
+export function rebuildCarpetGroup(group, mode) {
+  if (!isCarpetType(group.userData.furnitureType)) return;
+
+  const ring = group.userData.selectionRing;
+  if (ring) group.remove(ring);
+
+  const children = [...group.children];
+  for (const child of children) {
+    child.traverse((c) => {
+      if (c.geometry) c.geometry.dispose();
+      if (c.material) c.material.dispose();
+    });
+    group.remove(child);
+  }
+
+  const type = group.userData.furnitureType;
+  const def = FURNITURE_ITEMS[type];
+  const w = group.userData.sizeW ?? def.size.w;
+  const h = def.size.h;
+  const d = group.userData.sizeD ?? def.size.d;
+
+  buildCarpet(group, w, h, d, def, mode === 'architect', {
+    shape: group.userData.carpetShape,
+    pattern: group.userData.carpetPattern,
+    color: group.userData.carpetColor,
+    accent: group.userData.carpetAccent,
+  });
+
+  if (ring) {
+    group.add(ring);
+  }
+}
+
+function makeMaterial(color, architect, { isGlass = false, emissive = null, keepColor = false, doubleSided = false, roughness = null } = {}) {
   if (architect && !keepColor) {
     return new THREE.MeshLambertMaterial({
       color: isGlass ? 0x88aacc : 0x8899aa,
@@ -1406,7 +2081,7 @@ function makeMaterial(color, architect, { isGlass = false, emissive = null, keep
 
   const mat = new THREE.MeshStandardMaterial({
     color,
-    roughness: architect ? 0.5 : 0.65,
+    roughness: roughness ?? (architect ? 0.5 : 0.65),
     metalness: 0.04,
     side: doubleSided ? THREE.DoubleSide : THREE.FrontSide,
   });

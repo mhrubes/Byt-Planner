@@ -5,12 +5,13 @@ import {
   normalizeWall,
   snapWallEndpoint,
   wallKey,
+  carpetRectFromGrid,
   GRID_SIZE,
   getPlotLayout,
   shiftWallsToPlot,
   shiftFurnitureToPlot,
 } from './apartments.js';
-import { FURNITURE_CATALOG, CATALOG_CATEGORIES, isDoorType, isOpenableType, isShelfCabinetType, applyDoorOpenState } from './furniture.js';
+import { FURNITURE_CATALOG, CATALOG_CATEGORIES, isDoorType, isOpenableType, isShelfCabinetType, isCarpetType, CARPET_SHAPES, CARPET_STYLE_DEFAULTS, getCarpetPatternsForType, rebuildCarpetGroup, applyDoorOpenState } from './furniture.js';
 import { SceneManager } from './scene.js';
 import { loadSave, writeSave, clearSave } from './storage.js';
 
@@ -28,6 +29,10 @@ export class BytPlannerApp {
     this.isPlacingDrag = false;
     this.placingType = null;
     this.placingGridPos = null;
+    this.carpetDragStart = null;
+    this.carpetDragEnd = null;
+    this.isCarpetDrag = false;
+    this.carpetStyleDefaults = structuredClone(CARPET_STYLE_DEFAULTS);
     this.wallSnap45 = false;
     this.furnitureClipboard = null;
     this.cursorFollowFurniture = null;
@@ -93,6 +98,25 @@ export class BytPlannerApp {
             <h3 id="openable-options-title">Dveře a okna</h3>
             <button type="button" class="save-btn" id="door-open-toggle">🚪 Otevřít průchod</button>
             <p class="save-hint" id="door-open-hint">Přepne otevřený průchod ve zdi · klávesa <kbd>O</kbd></p>
+          </section>
+
+          <section class="panel-section architect-only hidden" id="carpet-options">
+            <h3 id="carpet-options-title">Koberec</h3>
+            <p class="save-hint" id="carpet-options-hint">Uprav tvar, vzor a barvy</p>
+            <h4 class="carpet-opt-label">Tvar</h4>
+            <div class="carpet-option-row" id="carpet-shape-btns"></div>
+            <h4 class="carpet-opt-label">Vzor</h4>
+            <div class="carpet-option-row" id="carpet-pattern-btns"></div>
+            <div class="carpet-color-row">
+              <label class="carpet-color-field">
+                <span>Hlavní</span>
+                <input type="color" id="carpet-color-main" />
+              </label>
+              <label class="carpet-color-field">
+                <span>Doplňková</span>
+                <input type="color" id="carpet-color-accent" />
+              </label>
+            </div>
           </section>
 
           <section class="panel-section architect-only catalog-section">
@@ -178,6 +202,12 @@ export class BytPlannerApp {
     this.doorOptionsPanel = this.root.querySelector('#door-options');
     this.doorOpenToggle = this.root.querySelector('#door-open-toggle');
     this.openableOptionsTitle = this.root.querySelector('#openable-options-title');
+    this.carpetOptionsPanel = this.root.querySelector('#carpet-options');
+    this.carpetOptionsTitle = this.root.querySelector('#carpet-options-title');
+    this.carpetOptionsHint = this.root.querySelector('#carpet-options-hint');
+    this.carpetColorMain = this.root.querySelector('#carpet-color-main');
+    this.carpetColorAccent = this.root.querySelector('#carpet-color-accent');
+    this.renderCarpetShapeButtons();
     this.applyLeftPanelCollapsed(this.leftPanelCollapsed);
 
     const aptBtns = this.root.querySelector('#apartment-btns');
@@ -601,6 +631,7 @@ export class BytPlannerApp {
     this.updateStatus();
     this.updateSaveHintDefault();
     this.updateDoorOptionsPanel();
+    this.updateCarpetOptionsPanel();
   }
 
   setTool(tool) {
@@ -625,7 +656,13 @@ export class BytPlannerApp {
       if (this.placingType) {
         const label = FURNITURE_CATALOG[this.placingType].label;
         extra = ` · Umisťuješ: ${label}`;
-        statusHint = '→ Drž levé tlačítko, táhni a pusť';
+        if (isCarpetType(this.placingType)) {
+          statusHint = this.carpetDragStart
+            ? '→ Pusť tlačítko pro velikost koberec'
+            : '→ Na podlaze drž a táhni roh na roh';
+        } else {
+          statusHint = '→ Drž levé tlačítko, táhni a pusť';
+        }
       } else if (this.cursorFollowFurniture) {
         extra = ' · Umisťuješ kopii';
         statusHint = '→ Přesuň myší a klikni pro umístění · Esc zruší';
@@ -652,7 +689,8 @@ export class BytPlannerApp {
   updatePlacementUI() {
     const isPlacing = this.mode === 'architect' && this.placingType;
     const def = isPlacing ? FURNITURE_CATALOG[this.placingType] : null;
-    const isDragging = this.isPlacingDrag;
+    const isDragging = this.isPlacingDrag || this.isCarpetDrag;
+    const isCarpet = isPlacing && isCarpetType(this.placingType);
 
     this.placementBanner.classList.toggle('hidden', !isPlacing || isDragging);
     this.canvasContainer.classList.toggle('placing-mode', isPlacing);
@@ -662,9 +700,18 @@ export class BytPlannerApp {
       this.placementBannerIcon.textContent = def.icon;
       this.placementBannerTitle.textContent =
         isDragging ? `Pusť tlačítko — ${def.label}` : `Táhni do plánu — ${def.label}`;
-      this.placementBannerText.innerHTML =
-        'Drž levé tlačítko na podlaze, přesuň a pusť · <kbd>R</kbd> otočí po umístění · <kbd>Esc</kbd> zruší';
-      this.architectHints.innerHTML = `
+      this.placementBannerText.innerHTML = isCarpet
+        ? 'Na podlaze drž levé tlačítko v jednom rohu, táhni na protější roh a pusť · <kbd>Esc</kbd> zruší'
+        : 'Drž levé tlačítko na podlaze, přesuň a pusť · <kbd>R</kbd> otočí po umístění · <kbd>Esc</kbd> zruší';
+      this.architectHints.innerHTML = isCarpet
+        ? `
+        <strong>Právě umisťuješ: ${def.label}</strong>
+        1. Na podlaze <strong>drž levé tlačítko</strong> v prvním rohu.<br />
+        2. Táhni na protější roh — uvidíš modrý náhled velikosti.<br />
+        3. <strong>Pusť tlačítko</strong> — koberec se položí.<br />
+        <kbd>Esc</kbd> zruší
+      `
+        : `
         <strong>Právě umisťuješ: ${def.label}</strong>
         1. Na podlaze v plánu <strong>drž levé tlačítko</strong> myši.<br />
         2. Táhni tam, kam to patří — uvidíš oranžový náhled.<br />
@@ -726,6 +773,8 @@ export class BytPlannerApp {
     this.root.querySelector('#reset-btn')?.addEventListener('click', () => this.resetCurrentApartment());
     this.leftPanelToggle?.addEventListener('click', () => this.toggleLeftPanel());
     this.doorOpenToggle?.addEventListener('click', () => this.toggleSelectedDoorOpen());
+    this.carpetColorMain?.addEventListener('input', () => this.applyCarpetColor('carpetColor', this.carpetColorMain.value));
+    this.carpetColorAccent?.addEventListener('input', () => this.applyCarpetColor('carpetAccent', this.carpetColorAccent.value));
 
     window.addEventListener('beforeunload', () => {
       if (this.mode === 'architect') this.saveNow({ auto: true, quiet: true });
@@ -738,7 +787,15 @@ export class BytPlannerApp {
     this.placingType = type;
     this.placingGridPos = null;
     this.isPlacingDrag = false;
-    this.scene.setPlacementGhost(type);
+    this.carpetDragStart = null;
+    this.carpetDragEnd = null;
+    this.isCarpetDrag = false;
+    this.scene.clearCarpetPreview();
+    if (isCarpetType(type)) {
+      this.scene.clearPlacementGhost();
+    } else {
+      this.scene.setPlacementGhost(type);
+    }
 
     this.root.querySelectorAll('.furniture-item').forEach((item) => {
       item.classList.toggle('placing', catalogEl ? item === catalogEl : item.dataset.type === type);
@@ -746,6 +803,7 @@ export class BytPlannerApp {
     this.root.querySelectorAll('.tool-btn').forEach((btn) => {
       btn.classList.toggle('active', btn.dataset.tool === 'select');
     });
+    this.updateCarpetOptionsPanel();
     this.updateStatus();
   }
 
@@ -753,12 +811,17 @@ export class BytPlannerApp {
     this.placingType = null;
     this.placingGridPos = null;
     this.isPlacingDrag = false;
+    this.carpetDragStart = null;
+    this.carpetDragEnd = null;
+    this.isCarpetDrag = false;
     this.scene.clearPlacementGhost();
+    this.scene.clearCarpetPreview();
     this.root.querySelectorAll('.furniture-item').forEach((item) => {
       item.classList.remove('placing');
     });
     this.scene.controls.enabled = true;
     this.canvasContainer?.classList.remove('placing-drag');
+    this.updateCarpetOptionsPanel();
   }
 
   updatePlacingGhostFromEvent(e) {
@@ -772,6 +835,30 @@ export class BytPlannerApp {
 
     this.placingGridPos = grid;
     this.scene.updatePlacementGhost(grid.x, grid.z);
+  }
+
+  commitCarpetPlacement() {
+    if (!this.placingType || !this.carpetDragStart || !this.carpetDragEnd) return;
+
+    const rect = carpetRectFromGrid(this.carpetDragStart, this.carpetDragEnd);
+    const type = this.placingType;
+    const style = this.carpetStyleDefaults[type] ?? {};
+    const furn = this.scene.addFurniture(type, rect.x, rect.z, 0, {
+      sizeW: rect.sizeW,
+      sizeD: rect.sizeD,
+      carpetShape: style.shape,
+      carpetPattern: style.pattern,
+      carpetColor: style.color,
+      carpetAccent: style.accent,
+    });
+    if (furn) this.selectFurniture(furn);
+    this.carpetDragStart = null;
+    this.carpetDragEnd = null;
+    this.isCarpetDrag = false;
+    this.scene.clearCarpetPreview();
+    this.cancelPlacing();
+    this.updateStatus();
+    this.scheduleSave();
   }
 
   commitPlacement() {
@@ -798,6 +885,27 @@ export class BytPlannerApp {
 
     if (this.mode === 'architect') {
       if (this.placingType) {
+        if (isCarpetType(this.placingType)) {
+          const hit = this.scene.raycast(e.clientX, e.clientY, { includeGround: true });
+          if (hit?.point) {
+            const grid = this.scene.snapToGrid(hit.point.x, hit.point.z);
+            this.carpetDragStart = grid;
+            this.carpetDragEnd = grid;
+            this.isCarpetDrag = true;
+            this.scene.controls.enabled = false;
+            e.target.setPointerCapture(e.pointerId);
+            this.scene.setCarpetPreview(
+              this.placingType,
+              grid,
+              grid,
+              this.carpetStyleDefaults[this.placingType]
+            );
+            this.updatePlacementUI();
+            this.updateStatus();
+          }
+          return;
+        }
+
         this.isPlacingDrag = true;
         this.scene.controls.enabled = false;
         e.target.setPointerCapture(e.pointerId);
@@ -826,6 +934,22 @@ export class BytPlannerApp {
   }
 
   onPointerMove(e) {
+    if (this.placingType && isCarpetType(this.placingType) && this.isCarpetDrag) {
+      const hit = this.scene.raycast(e.clientX, e.clientY, { includeGround: true });
+      if (hit?.point) {
+        const grid = this.scene.snapToGrid(hit.point.x, hit.point.z);
+        this.carpetDragEnd = grid;
+        this.scene.setCarpetPreview(
+          this.placingType,
+          this.carpetDragStart,
+          grid,
+          this.carpetStyleDefaults[this.placingType]
+        );
+        this.updateStatus();
+      }
+      return;
+    }
+
     if (this.placingType) {
       this.updatePlacingGhostFromEvent(e);
     }
@@ -878,6 +1002,19 @@ export class BytPlannerApp {
 
   onPointerUp(e) {
     if (e.button !== 0) return;
+
+    if (this.isCarpetDrag) {
+      this.isCarpetDrag = false;
+      e.target.releasePointerCapture?.(e.pointerId);
+      this.scene.controls.enabled = true;
+      if (this.carpetDragStart && this.carpetDragEnd) {
+        this.commitCarpetPlacement();
+      } else {
+        this.scene.clearCarpetPreview();
+        this.updatePlacementUI();
+      }
+      return;
+    }
 
     if (this.isPlacingDrag) {
       this.isPlacingDrag = false;
@@ -985,7 +1122,138 @@ export class BytPlannerApp {
       obj.userData.selectionRing = ring;
     }
     obj.userData.selectionRing.visible = true;
+    if (isCarpetType(obj.userData.furnitureType)) {
+      const span = Math.max(obj.userData.sizeW ?? 1, obj.userData.sizeD ?? 1);
+      const scale = span / 1.2;
+      obj.userData.selectionRing.scale.set(scale, scale, 1);
+    } else {
+      obj.userData.selectionRing.scale.set(1, 1, 1);
+    }
     this.updateDoorOptionsPanel();
+    this.updateCarpetOptionsPanel();
+  }
+
+  getActiveCarpetType() {
+    if (this.selectedFurniture && isCarpetType(this.selectedFurniture.userData.furnitureType)) {
+      return this.selectedFurniture.userData.furnitureType;
+    }
+    if (this.placingType && isCarpetType(this.placingType)) {
+      return this.placingType;
+    }
+    return null;
+  }
+
+  getActiveCarpetStyle() {
+    const type = this.getActiveCarpetType();
+    if (!type) return null;
+    if (this.selectedFurniture && isCarpetType(this.selectedFurniture.userData.furnitureType)) {
+      const ud = this.selectedFurniture.userData;
+      return {
+        shape: ud.carpetShape,
+        pattern: ud.carpetPattern,
+        color: ud.carpetColor,
+        accent: ud.carpetAccent,
+      };
+    }
+    return this.carpetStyleDefaults[type];
+  }
+
+  renderCarpetShapeButtons() {
+    const row = this.root.querySelector('#carpet-shape-btns');
+    if (!row) return;
+    row.innerHTML = '';
+    for (const [id, meta] of Object.entries(CARPET_SHAPES)) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'carpet-opt-btn';
+      btn.dataset.shape = id;
+      btn.title = meta.label;
+      btn.textContent = `${meta.icon} ${meta.label}`;
+      btn.addEventListener('click', () => this.applyCarpetShape(id));
+      row.appendChild(btn);
+    }
+  }
+
+  renderCarpetPatternButtons(type) {
+    const row = this.root.querySelector('#carpet-pattern-btns');
+    if (!row || !type) return;
+    const activePattern = this.getActiveCarpetStyle()?.pattern;
+    row.innerHTML = '';
+    for (const [id, meta] of getCarpetPatternsForType(type)) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'carpet-opt-btn';
+      btn.dataset.pattern = id;
+      btn.title = meta.label;
+      btn.textContent = `${meta.icon} ${meta.label}`;
+      btn.classList.toggle('active', id === activePattern);
+      btn.addEventListener('click', () => this.applyCarpetPattern(id));
+      row.appendChild(btn);
+    }
+  }
+
+  updateCarpetOptionsPanel() {
+    const carpetType = this.getActiveCarpetType();
+    const showPanel = this.mode === 'architect' && !!carpetType;
+    this.carpetOptionsPanel?.classList.toggle('hidden', !showPanel);
+    if (!showPanel) return;
+
+    const style = this.getActiveCarpetStyle();
+    const label = FURNITURE_CATALOG[carpetType].label;
+    this.carpetOptionsTitle.textContent = label;
+    this.carpetOptionsHint.textContent = this.selectedFurniture
+      ? 'Upravíš vybraný koberec'
+      : 'Nastavíš vzhled před položením';
+
+    this.root.querySelectorAll('[data-shape]').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.shape === style.shape);
+    });
+    this.renderCarpetPatternButtons(carpetType);
+
+    if (this.carpetColorMain) this.carpetColorMain.value = style.color;
+    if (this.carpetColorAccent) this.carpetColorAccent.value = style.accent;
+  }
+
+  applyCarpetShape(shape) {
+    const type = this.getActiveCarpetType();
+    if (!type) return;
+
+    if (this.selectedFurniture && isCarpetType(this.selectedFurniture.userData.furnitureType)) {
+      this.selectedFurniture.userData.carpetShape = shape;
+      rebuildCarpetGroup(this.selectedFurniture, this.mode);
+      this.scheduleSave();
+    }
+
+    this.carpetStyleDefaults[type].shape = shape;
+    this.updateCarpetOptionsPanel();
+  }
+
+  applyCarpetPattern(pattern) {
+    const type = this.getActiveCarpetType();
+    if (!type) return;
+
+    if (this.selectedFurniture && isCarpetType(this.selectedFurniture.userData.furnitureType)) {
+      this.selectedFurniture.userData.carpetPattern = pattern;
+      rebuildCarpetGroup(this.selectedFurniture, this.mode);
+      this.scheduleSave();
+    }
+
+    this.carpetStyleDefaults[type].pattern = pattern;
+    this.updateCarpetOptionsPanel();
+  }
+
+  applyCarpetColor(field, value) {
+    const type = this.getActiveCarpetType();
+    if (!type) return;
+
+    if (this.selectedFurniture && isCarpetType(this.selectedFurniture.userData.furnitureType)) {
+      this.selectedFurniture.userData[field] = value;
+      rebuildCarpetGroup(this.selectedFurniture, this.mode);
+      this.scheduleSave();
+    }
+
+    if (field === 'carpetColor') this.carpetStyleDefaults[type].color = value;
+    if (field === 'carpetAccent') this.carpetStyleDefaults[type].accent = value;
   }
 
   updateDoorOptionsPanel() {
@@ -1009,6 +1277,11 @@ export class BytPlannerApp {
       this.doorOpenToggle.textContent = open ? '🔒 Zavřít dvířka' : '🗄️ Otevřít dvířka';
       this.root.querySelector('#door-open-hint').textContent =
         'Ukáže nebo skryje oblečení ve skříni · klávesa O';
+    } else if (item.userData.furnitureType === 'bath_shelf') {
+      this.openableOptionsTitle.textContent = 'Bambusová skříňka';
+      this.doorOpenToggle.textContent = open ? '🔒 Zavřít dvířka' : '🗄️ Otevřít dvířka';
+      this.root.querySelector('#door-open-hint').textContent =
+        'Otevře lamelová dvířka s ručníky uvnitř · klávesa O';
     } else if (isShelfCabinetType(item.userData.furnitureType)) {
       this.openableOptionsTitle.textContent = 'Skříňka';
       this.doorOpenToggle.textContent = open ? '🔒 Zavřít dvířka' : '🗄️ Otevřít dvířka';
@@ -1047,6 +1320,7 @@ export class BytPlannerApp {
     }
     this.selectedFurniture = null;
     this.updateDoorOptionsPanel();
+    this.updateCarpetOptionsPanel();
   }
 
   clearSelection() {
@@ -1065,6 +1339,7 @@ export class BytPlannerApp {
     if (this.selectedFurniture === obj) this.selectedFurniture = null;
     if (wasOpenDoor) this.scene.refreshWallOpenings();
     this.updateDoorOptionsPanel();
+    this.updateCarpetOptionsPanel();
   }
 
   copySelected() {
@@ -1075,6 +1350,14 @@ export class BytPlannerApp {
       rotation: this.selectedFurniture.rotation.y,
       doorOpen: this.selectedFurniture.userData.doorOpen ?? false,
     };
+    if (isCarpetType(this.furnitureClipboard.type)) {
+      this.furnitureClipboard.sizeW = this.selectedFurniture.userData.sizeW;
+      this.furnitureClipboard.sizeD = this.selectedFurniture.userData.sizeD;
+      this.furnitureClipboard.carpetShape = this.selectedFurniture.userData.carpetShape;
+      this.furnitureClipboard.carpetPattern = this.selectedFurniture.userData.carpetPattern;
+      this.furnitureClipboard.carpetColor = this.selectedFurniture.userData.carpetColor;
+      this.furnitureClipboard.carpetAccent = this.selectedFurniture.userData.carpetAccent;
+    }
     this.flashCopyHint('Zkopírováno ✓');
   }
 
@@ -1100,7 +1383,15 @@ export class BytPlannerApp {
       x,
       z,
       this.furnitureClipboard.rotation,
-      { doorOpen: this.furnitureClipboard.doorOpen ?? false }
+      {
+        doorOpen: this.furnitureClipboard.doorOpen ?? false,
+        sizeW: this.furnitureClipboard.sizeW,
+        sizeD: this.furnitureClipboard.sizeD,
+        carpetShape: this.furnitureClipboard.carpetShape,
+        carpetPattern: this.furnitureClipboard.carpetPattern,
+        carpetColor: this.furnitureClipboard.carpetColor,
+        carpetAccent: this.furnitureClipboard.carpetAccent,
+      }
     );
     if (!furn) return;
 
@@ -1148,6 +1439,7 @@ export class BytPlannerApp {
 
   rotateSelected() {
     if (!this.selectedFurniture || this.mode !== 'architect') return;
+    if (!this.selectedFurniture.userData.rotatable) return;
     this.selectedFurniture.rotation.y += Math.PI / 2;
     if (isDoorType(this.selectedFurniture.userData.furnitureType) && this.selectedFurniture.userData.doorOpen) {
       this.scene.refreshWallOpenings();

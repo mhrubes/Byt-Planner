@@ -450,6 +450,69 @@ body,
   color: var(--accent-hover);
 }
 
+.carpet-opt-label {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin: 10px 0 6px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.carpet-option-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+
+.carpet-opt-btn {
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 6px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+}
+
+.carpet-opt-btn:hover {
+  border-color: var(--accent);
+  background: rgba(91, 141, 239, 0.1);
+}
+
+.carpet-opt-btn.active {
+  border-color: var(--architect);
+  background: rgba(245, 158, 11, 0.15);
+  color: #fcd34d;
+}
+
+.carpet-color-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.carpet-color-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.carpet-color-field input[type='color'] {
+  width: 100%;
+  height: 34px;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  padding: 2px;
+}
+
 .furniture-list {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

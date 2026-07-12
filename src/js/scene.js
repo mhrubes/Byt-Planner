@@ -1,12 +1,13 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { GRID_SIZE, WALL_HEIGHT, WALL_THICKNESS, applyOpenDoorGaps } from './apartments.js';
+import { GRID_SIZE, WALL_HEIGHT, WALL_THICKNESS, applyOpenDoorGaps, carpetRectFromGrid } from './apartments.js';
 import {
   createFurnitureMesh,
   updateFurnitureMaterials,
   FURNITURE_CATALOG,
   isDoorType,
   isOpenableType,
+  isCarpetType,
   applyDoorOpenState,
 } from './furniture.js';
 
@@ -52,6 +53,7 @@ export class SceneManager {
     this.gridGroup = new THREE.Group();
     this.floorGroup = new THREE.Group();
     this.placementGhost = null;
+    this.carpetPreview = null;
     this.raycastPlane = null;
     this.scene.add(
       this.floorGroup,
@@ -384,8 +386,23 @@ export class SceneManager {
     }
   }
 
-  addFurniture(type, x, z, rotation = 0, { doorOpen = false } = {}) {
-    const mesh = createFurnitureMesh(type, this.mode);
+  addFurniture(type, x, z, rotation = 0, {
+    doorOpen = false,
+    sizeW,
+    sizeD,
+    carpetShape,
+    carpetPattern,
+    carpetColor,
+    carpetAccent,
+  } = {}) {
+    const mesh = createFurnitureMesh(type, this.mode, {
+      sizeW,
+      sizeD,
+      carpetShape,
+      carpetPattern,
+      carpetColor,
+      carpetAccent,
+    });
     if (!mesh) return null;
     mesh.position.set(x * GRID_SIZE, 0, z * GRID_SIZE);
     mesh.rotation.y = rotation;
@@ -412,6 +429,14 @@ export class SceneManager {
       if (isOpenableType(item.type)) {
         item.doorOpen = !!f.userData.doorOpen;
       }
+      if (isCarpetType(item.type)) {
+        item.sizeW = f.userData.sizeW;
+        item.sizeD = f.userData.sizeD;
+        item.carpetShape = f.userData.carpetShape;
+        item.carpetPattern = f.userData.carpetPattern;
+        item.carpetColor = f.userData.carpetColor;
+        item.carpetAccent = f.userData.carpetAccent;
+      }
       return item;
     });
   }
@@ -422,6 +447,12 @@ export class SceneManager {
       if (!item?.type) continue;
       this.addFurniture(item.type, item.x, item.z, item.rotation ?? 0, {
         doorOpen: item.doorOpen ?? false,
+        sizeW: item.sizeW,
+        sizeD: item.sizeD,
+        carpetShape: item.carpetShape,
+        carpetPattern: item.carpetPattern,
+        carpetColor: item.carpetColor,
+        carpetAccent: item.carpetAccent,
       });
     }
     this.refreshWallOpenings();
@@ -570,6 +601,47 @@ export class SceneManager {
     });
     this.ghostGroup.remove(this.placementGhost);
     this.placementGhost = null;
+  }
+
+  setCarpetPreview(type, start, end, style = {}) {
+    this.clearCarpetPreview();
+    if (!type || !start || !end) return;
+
+    const rect = carpetRectFromGrid(start, end);
+    const ghost = createFurnitureMesh(type, 'architect', {
+      sizeW: rect.sizeW,
+      sizeD: rect.sizeD,
+      carpetShape: style.shape,
+      carpetPattern: style.pattern,
+      carpetColor: style.color,
+      carpetAccent: style.accent,
+    });
+    if (!ghost) return;
+
+    ghost.position.set(rect.x * GRID_SIZE, 0, rect.z * GRID_SIZE);
+    ghost.traverse((child) => {
+      if (!child.isMesh) return;
+      child.material = new THREE.MeshBasicMaterial({
+        color: 0x5b8def,
+        transparent: true,
+        opacity: 0.45,
+      });
+      child.castShadow = false;
+      child.receiveShadow = false;
+    });
+    ghost.userData.isCarpetPreview = true;
+    this.carpetPreview = ghost;
+    this.ghostGroup.add(ghost);
+  }
+
+  clearCarpetPreview() {
+    if (!this.carpetPreview) return;
+    this.carpetPreview.traverse((c) => {
+      if (c.geometry) c.geometry.dispose();
+      if (c.material) c.material.dispose();
+    });
+    this.ghostGroup.remove(this.carpetPreview);
+    this.carpetPreview = null;
   }
 
   getGroundGridPosition(clientX, clientY) {
