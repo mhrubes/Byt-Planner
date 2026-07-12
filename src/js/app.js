@@ -103,11 +103,13 @@ export class BytPlannerApp {
           <section class="panel-section preview-only">
             <h3>Barva stěn</h3>
             <div class="color-picker-row" id="wall-colors"></div>
+            <div class="color-custom-picker" id="wall-color-custom"></div>
           </section>
 
           <section class="panel-section preview-only">
             <h3>Barva podlahy</h3>
             <div class="color-picker-row" id="floor-colors"></div>
+            <div class="color-custom-picker" id="floor-color-custom"></div>
           </section>
 
           <div class="hint-box architect-only" id="architect-hints">
@@ -193,14 +195,144 @@ export class BytPlannerApp {
     const wallColors = ['#f5f5f0', '#e8dcc8', '#d4e8f0', '#f0e8d4', '#e0d4f0', '#ffffff'];
     const floorColors = ['#c9b896', '#b8956a', '#8b7355', '#d4c4a8', '#a08060', '#e8dcc8'];
 
-    this.renderColorSwatches('#wall-colors', wallColors, (c) => {
-      this.scene.setWallColor(c);
-      this.scheduleSave();
+    this.wallColorPicker = this.renderCustomColorPicker('#wall-color-custom', {
+      initial: wallColors[0],
+      onChange: (c) => this.applyWallColor(c),
     });
-    this.renderColorSwatches('#floor-colors', floorColors, (c) => {
-      this.scene.setFloorColor(c);
-      this.scheduleSave();
-    }, 0);
+    this.floorColorPicker = this.renderCustomColorPicker('#floor-color-custom', {
+      initial: floorColors[0],
+      onChange: (c) => this.applyFloorColor(c),
+    });
+
+    this.renderColorSwatches('#wall-colors', wallColors, (c) => this.applyWallColor(c));
+    this.renderColorSwatches('#floor-colors', floorColors, (c) => this.applyFloorColor(c), 0);
+  }
+
+  normalizeHex(color) {
+    if (!color) return '#000000';
+    let hex = String(color).trim().toLowerCase();
+    if (!hex.startsWith('#')) hex = `#${hex}`;
+    if (hex.length === 4) {
+      hex = `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`;
+    }
+    return /^#[0-9a-f]{6}$/.test(hex) ? hex : '#000000';
+  }
+
+  hexToRgb(hex) {
+    const n = this.normalizeHex(hex).slice(1);
+    return {
+      r: parseInt(n.slice(0, 2), 16),
+      g: parseInt(n.slice(2, 4), 16),
+      b: parseInt(n.slice(4, 6), 16),
+    };
+  }
+
+  rgbToHex(r, g, b) {
+    const clamp = (v) => Math.max(0, Math.min(255, Math.round(Number(v) || 0)));
+    const to = (v) => clamp(v).toString(16).padStart(2, '0');
+    return `#${to(r)}${to(g)}${to(b)}`;
+  }
+
+  syncColorSelection(swatchSelector, customPicker, color) {
+    const hex = this.normalizeHex(color);
+    const container = this.root.querySelector(swatchSelector);
+    let matched = false;
+
+    container?.querySelectorAll('.color-swatch').forEach((swatch) => {
+      const isMatch = this.normalizeHex(swatch.dataset.color) === hex;
+      swatch.classList.toggle('active', isMatch);
+      if (isMatch) matched = true;
+    });
+
+    if (!matched) {
+      container?.querySelectorAll('.color-swatch').forEach((s) => s.classList.remove('active'));
+    }
+
+    customPicker?.setValue(hex);
+  }
+
+  applyWallColor(color) {
+    const hex = this.normalizeHex(color);
+    this.scene.setWallColor(hex);
+    this.syncColorSelection('#wall-colors', this.wallColorPicker, hex);
+    this.persistColors();
+  }
+
+  applyFloorColor(color) {
+    const hex = this.normalizeHex(color);
+    this.scene.setFloorColor(hex);
+    this.syncColorSelection('#floor-colors', this.floorColorPicker, hex);
+    this.persistColors();
+  }
+
+  persistColors() {
+    this.savedData.wallColor = this.scene.wallColor;
+    this.savedData.floorColor = this.scene.floorColor;
+    writeSave(this.savedData);
+  }
+
+  renderCustomColorPicker(containerSel, { initial, onChange }) {
+    const container = this.root.querySelector(containerSel);
+    if (!container) return null;
+
+    const label = document.createElement('span');
+    label.className = 'color-custom-label';
+    label.textContent = 'Vlastní RGB';
+
+    const colorInput = document.createElement('input');
+    colorInput.type = 'color';
+    colorInput.className = 'color-input-native';
+    colorInput.setAttribute('aria-label', 'Výběr barvy');
+
+    const rgbWrap = document.createElement('div');
+    rgbWrap.className = 'color-rgb-inputs';
+
+    const fields = {};
+    let syncing = false;
+
+    const emit = (hex) => {
+      if (syncing) return;
+      onChange(hex);
+    };
+
+    const setValue = (hex) => {
+      syncing = true;
+      const normalized = this.normalizeHex(hex);
+      colorInput.value = normalized;
+      const { r, g, b } = this.hexToRgb(normalized);
+      fields.r.value = r;
+      fields.g.value = g;
+      fields.b.value = b;
+      syncing = false;
+    };
+
+    colorInput.addEventListener('input', () => emit(colorInput.value));
+
+    for (const ch of ['r', 'g', 'b']) {
+      const field = document.createElement('div');
+      field.className = 'color-rgb-field';
+
+      const fieldLabel = document.createElement('label');
+      fieldLabel.textContent = ch.toUpperCase();
+
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.min = '0';
+      input.max = '255';
+      input.className = 'color-rgb-input';
+      input.addEventListener('input', () => {
+        emit(this.rgbToHex(fields.r.value, fields.g.value, fields.b.value));
+      });
+
+      fields[ch] = input;
+      field.append(fieldLabel, input);
+      rgbWrap.appendChild(field);
+    }
+
+    container.append(label, colorInput, rgbWrap);
+    setValue(initial);
+
+    return { setValue, element: container };
   }
 
   restoreSession() {
@@ -208,12 +340,10 @@ export class BytPlannerApp {
     this.loadApartment(initialApt);
 
     if (this.savedData.wallColor) {
-      this.scene.setWallColor(this.savedData.wallColor);
-      this.setColorSwatchActive('#wall-colors', this.savedData.wallColor);
+      this.applyWallColor(this.savedData.wallColor);
     }
     if (this.savedData.floorColor) {
-      this.scene.setFloorColor(this.savedData.floorColor);
-      this.setColorSwatchActive('#floor-colors', this.savedData.floorColor);
+      this.applyFloorColor(this.savedData.floorColor);
     }
     if (this.savedData.mode && this.savedData.mode !== this.mode) {
       this.setMode(this.savedData.mode);
@@ -221,11 +351,17 @@ export class BytPlannerApp {
     this.updateSaveHintDefault();
   }
 
-  setColorSwatchActive(selector, color) {
+  renderColorSwatches(selector, colors, onPick, activeIdx = 0) {
     const container = this.root.querySelector(selector);
-    if (!container) return;
-    container.querySelectorAll('.color-swatch').forEach((swatch) => {
-      swatch.classList.toggle('active', swatch.dataset.color === color);
+    colors.forEach((color, i) => {
+      const swatch = document.createElement('button');
+      swatch.type = 'button';
+      swatch.className = 'color-swatch' + (i === activeIdx ? ' active' : '');
+      swatch.style.background = color;
+      swatch.dataset.color = color;
+      swatch.setAttribute('aria-label', `Barva ${color}`);
+      swatch.addEventListener('click', () => onPick(color));
+      container.appendChild(swatch);
     });
   }
 
