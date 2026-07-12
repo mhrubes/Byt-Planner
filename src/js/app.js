@@ -1413,10 +1413,20 @@ export class BytPlannerApp {
         });
         const ring = new THREE.Mesh(ringGeo, ringMat);
         ring.rotation.x = -Math.PI / 2;
-        ring.position.y = 0.03;
         ring.userData.isSelectionRing = true;
         obj.add(ring);
         obj.userData.selectionRing = ring;
+      }
+      const type = obj.userData.furnitureType;
+      const def = FURNITURE_CATALOG[type];
+      const mountOff = getFurnitureMountOffset(type);
+      const dropH = def?.size?.h ?? 1;
+      if (mountOff >= 2.5) {
+        obj.userData.selectionRing.position.y = -dropH + 0.1;
+      } else if (mountOff > 0.2) {
+        obj.userData.selectionRing.position.y = -dropH * 0.45;
+      } else {
+        obj.userData.selectionRing.position.y = 0.03;
       }
       obj.userData.selectionRing.visible = true;
       if (isCarpetType(obj.userData.furnitureType)) {

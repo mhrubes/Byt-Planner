@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { WALL_THICKNESS } from './apartments.js';
+import { WALL_THICKNESS, WALL_HEIGHT } from './apartments.js';
 
 /** Definice všech položek — rozměry v metrech */
 const FURNITURE_ITEMS = {
@@ -227,6 +227,31 @@ const FURNITURE_ITEMS = {
     color: '#fff4dc',
     accent: '#e8c860',
     pole: '#666666',
+  },
+  lamp_pendant: {
+    label: 'Závěsná lampa',
+    icon: '🔅',
+    size: { w: 0.42, h: 0.88, d: 0.42 },
+    color: '#fff6e8',
+    accent: '#c9a030',
+    cord: '#3a3a3a',
+    mountOffset: WALL_HEIGHT,
+  },
+  lamp_ceiling: {
+    label: 'Stropní světlo',
+    icon: '💡',
+    size: { w: 0.4, h: 0.14, d: 0.4 },
+    color: '#faf8f0',
+    accent: '#c8b878',
+    mountOffset: WALL_HEIGHT,
+  },
+  lamp_wall: {
+    label: 'Nástěnné světlo',
+    icon: '🕯️',
+    size: { w: 0.3, h: 0.4, d: 0.12 },
+    color: '#f5f0e4',
+    accent: '#2e2e32',
+    mountOffset: WALL_HEIGHT * 0.75,
   },
   bed: {
     label: 'Postel pro dva',
@@ -456,14 +481,14 @@ export const CATALOG_CATEGORIES = [
     items: [
       'sofa', 'armchair', 'tv', 'fireplace', 'table', 'bookshelf',
       'shelf_small', 'shelf_small_cabinet', 'shelf_medium', 'shelf_medium_cabinet', 'shelf_large', 'shelf_large_cabinet',
-      'plant', 'plant_medium', 'plant_large', 'lamp_small', 'lamp_medium', 'lamp', 'carpet',
+      'plant', 'plant_medium', 'plant_large', 'lamp_small', 'lamp_medium', 'lamp', 'lamp_pendant', 'lamp_ceiling', 'lamp_wall', 'carpet',
     ],
   },
   {
     id: 'bedroom',
     label: 'Ložnice',
     icon: '🛏️',
-    items: ['bed_single', 'bed_double', 'wardrobe', 'nightstand', 'shelf_small', 'shelf_small_cabinet', 'plant', 'plant_medium', 'lamp_small', 'lamp_medium', 'lamp'],
+    items: ['bed_single', 'bed_double', 'wardrobe', 'nightstand', 'shelf_small', 'shelf_small_cabinet', 'plant', 'plant_medium', 'lamp_small', 'lamp_medium', 'lamp', 'lamp_pendant', 'lamp_ceiling', 'lamp_wall'],
   },
   {
     id: 'kitchen',
@@ -475,13 +500,13 @@ export const CATALOG_CATEGORIES = [
     id: 'office',
     label: 'Pracovna',
     icon: '🖥️',
-    items: ['desk_small', 'desk_medium', 'desk_large', 'chair', 'bookshelf', 'shelf_medium', 'shelf_medium_cabinet', 'lamp_small', 'lamp_medium'],
+    items: ['desk_small', 'desk_medium', 'desk_large', 'chair', 'bookshelf', 'shelf_medium', 'shelf_medium_cabinet', 'lamp_small', 'lamp_medium', 'lamp_pendant', 'lamp_ceiling', 'lamp_wall'],
   },
   {
     id: 'bathroom',
     label: 'Koupelna',
     icon: '🛁',
-    items: ['toilet', 'sink', 'bathtub', 'bath_shelf', 'shower', 'radiator', 'bath_carpet'],
+    items: ['toilet', 'sink', 'bathtub', 'bath_shelf', 'shower', 'radiator', 'bath_carpet', 'lamp_wall'],
   },
 ];
 
@@ -520,7 +545,7 @@ export function isTvWallInsetStyle(tvStyle) {
 
 /** Zarovnání na zeď + výřez ve zdi (dveře, okna, TV zapuštěná ve zdi) */
 export function usesWallSnap(type, tvStyle) {
-  return isWallGapType(type) || (isTvType(type) && isTvWallInsetStyle(tvStyle));
+  return isWallGapType(type) || (isTvType(type) && isTvWallInsetStyle(tvStyle)) || type === 'lamp_wall';
 }
 
 export const CARPET_SHAPES = {
@@ -713,6 +738,15 @@ export function createFurnitureMesh(type, mode = 'preview', {
       break;
     case 'lamp_small':
       buildLampSmall(group, w, h, d, def, isArchitect);
+      break;
+    case 'lamp_pendant':
+      buildLampPendant(group, w, h, d, def, isArchitect);
+      break;
+    case 'lamp_ceiling':
+      buildLampCeiling(group, w, h, d, def, isArchitect);
+      break;
+    case 'lamp_wall':
+      buildLampWall(group, w, h, d, def, isArchitect);
       break;
     case 'wardrobe':
       buildWardrobe(group, w, h, d, def, isArchitect);
@@ -2076,6 +2110,74 @@ function buildLampLarge(group, w, h, d, def, architect) {
   addBox(group, w * 0.2, h * 0.06, w * 0.2, 0, h * 0.87, 0, def.accent, architect);
   addBox(group, w * 1.45, h * 0.22, w * 1.45, 0, h * 0.96, 0, def.color, architect, { emissive: def.color });
   addBox(group, w * 1.25, h * 0.05, w * 1.25, 0, h * 0.86, 0, def.accent, architect);
+}
+
+function buildLampPendant(group, w, h, d, def, architect) {
+  const cord = def.cord ?? '#3a3a3a';
+  const canopyH = 0.035;
+  const cordH = h * 0.58;
+  const shadeH = h * 0.26;
+  const shadeY = -(canopyH + cordH + shadeH * 0.5);
+
+  addCylinder(group, w * 0.22, canopyH, '#2a2a2a', architect, { y: -canopyH * 0.5 });
+  addBox(group, w * 0.14, 0.012, d * 0.14, 0, -canopyH - 0.006, 0, def.accent, architect, { keepColor: true });
+  addCylinder(group, 0.006, cordH, cord, architect, { y: -canopyH - cordH * 0.5 });
+  addBox(group, w * 0.92, shadeH * 0.12, d * 0.92, 0, shadeY + shadeH * 0.46, 0, def.accent, architect, { keepColor: true });
+  addCylinder(group, w * 0.42, shadeH * 0.78, def.color, architect, {
+    y: shadeY,
+    keepColor: true,
+    emissive: '#ffe4a8',
+  });
+  addBox(group, w * 0.72, shadeH * 0.55, d * 0.72, 0, shadeY - shadeH * 0.08, 0, def.color, architect, {
+    emissive: '#fff0c8',
+    keepColor: true,
+  });
+  addSphere(group, w * 0.12, shadeY - shadeH * 0.22, '#fff8d8', architect, {
+    emissive: '#ffd878',
+    keepColor: true,
+  });
+  addCylinder(group, w * 0.38, 0.008, def.accent, architect, { y: shadeY - shadeH * 0.48 });
+}
+
+function buildLampCeiling(group, w, h, d, def, architect) {
+  const bodyH = h * 0.5;
+  const rimH = h * 0.28;
+  const glowH = h * 0.22;
+  const bodyY = -bodyH * 0.5;
+  const rimY = bodyY - bodyH * 0.5 - rimH * 0.5;
+  const glowY = rimY - rimH * 0.5 - glowH * 0.5;
+
+  addCylinder(group, w * 0.5, bodyH, '#2a2a2a', architect, { y: bodyY });
+  addCylinder(group, w * 0.46, rimH, def.accent, architect, { y: rimY, keepColor: true });
+  addCylinder(group, w * 0.4, glowH, def.color, architect, {
+    y: glowY,
+    emissive: '#fff4d0',
+    keepColor: true,
+  });
+  addSphere(group, w * 0.14, glowY - glowH * 0.15, '#fffce8', architect, {
+    emissive: '#ffe8a0',
+    keepColor: true,
+  });
+}
+
+function buildLampWall(group, w, h, d, def, architect) {
+  const plate = def.accent ?? '#2e2e32';
+  const centerZ = WALL_THICKNESS / 2 + d * 0.42;
+
+  addBox(group, w * 0.74, h * 0.58, d * 0.38, 0, h * 0.02, centerZ - d * 0.12, plate, architect, { keepColor: true });
+  addBox(group, w * 0.18, h * 0.14, d * 0.55, 0, h * 0.28, centerZ + d * 0.08, plate, architect, { keepColor: true });
+  addBox(group, w * 0.88, h * 0.36, d * 0.52, 0, -h * 0.06, centerZ + d * 0.18, def.color, architect, {
+    emissive: '#ffe8b0',
+    keepColor: true,
+  });
+  addBox(group, w * 0.7, h * 0.08, d * 0.4, 0, -h * 0.28, centerZ + d * 0.22, def.color, architect, {
+    emissive: '#fff0c8',
+    keepColor: true,
+  });
+  addSphere(group, w * 0.13, -h * 0.14, centerZ + d * 0.32, '#fff8e0', architect, {
+    emissive: '#ffd060',
+    keepColor: true,
+  });
 }
 
 function buildToilet(group, w, h, d, def, architect) {
