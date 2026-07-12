@@ -176,18 +176,44 @@ const FURNITURE_ITEMS = {
     pole: '#666666',
   },
   bed: {
-    label: 'Postel',
+    label: 'Postel pro dva',
     icon: '🛏️',
-    size: { w: 1.6, h: 0.5, d: 2.0 },
+    size: { w: 1.6, h: 0.55, d: 2.0 },
     color: '#e8e0d4',
-    accent: '#c4b8a8',
+    accent: '#8b7355',
+    duvet: '#c5d4e8',
+    sheet: '#f8f8f8',
+    pillows: 2,
+  },
+  bed_single: {
+    label: 'Postel pro jednoho',
+    icon: '🛌',
+    size: { w: 0.9, h: 0.55, d: 2.0 },
+    color: '#e8e0d4',
+    accent: '#8b7355',
+    duvet: '#d0dce8',
+    sheet: '#f8f8f8',
+    pillows: 1,
+  },
+  bed_double: {
+    label: 'Postel pro dva',
+    icon: '🛏️',
+    size: { w: 1.6, h: 0.55, d: 2.0 },
+    color: '#e8e0d4',
+    accent: '#8b7355',
+    duvet: '#c5d4e8',
+    sheet: '#f8f8f8',
+    pillows: 2,
   },
   wardrobe: {
-    label: 'Skříň',
+    label: 'Skříň na oblečení',
     icon: '🗄️',
     size: { w: 1.2, h: 2.2, d: 0.6 },
     color: '#5c4033',
     accent: '#7a5544',
+    shelf: '#8b6914',
+    withDoors: true,
+    doubleDoor: true,
   },
   nightstand: {
     label: 'Noční stolek',
@@ -269,7 +295,7 @@ export const CATALOG_CATEGORIES = [
     id: 'bedroom',
     label: 'Ložnice',
     icon: '🛏️',
-    items: ['bed', 'wardrobe', 'nightstand', 'shelf_small', 'shelf_small_cabinet', 'plant', 'plant_medium', 'lamp_small', 'lamp_medium', 'lamp'],
+    items: ['bed_single', 'bed_double', 'wardrobe', 'nightstand', 'shelf_small', 'shelf_small_cabinet', 'plant', 'plant_medium', 'lamp_small', 'lamp_medium', 'lamp'],
   },
   {
     id: 'kitchen',
@@ -301,11 +327,13 @@ export const SHELF_CABINET_TYPES = new Set([
   'shelf_large_cabinet',
 ]);
 
+export const CABINET_TYPES = new Set([...SHELF_CABINET_TYPES, 'wardrobe']);
+
 export const OPENABLE_TYPES = new Set([
   'door',
   'balcony_door',
   'window',
-  ...SHELF_CABINET_TYPES,
+  ...CABINET_TYPES,
 ]);
 
 export function isDoorType(type) {
@@ -314,6 +342,10 @@ export function isDoorType(type) {
 
 export function isShelfCabinetType(type) {
   return SHELF_CABINET_TYPES.has(type);
+}
+
+export function isCabinetType(type) {
+  return CABINET_TYPES.has(type);
 }
 
 export function isOpenableType(type) {
@@ -358,9 +390,9 @@ export function createFurnitureMesh(type, mode = 'preview') {
       addBox(group, w * 0.12, h * 0.25, d, w * 0.44, h * 0.375, 0, def.accent, isArchitect);
       break;
     case 'bed':
-      addBox(group, w, h * 0.4, d, 0, h * 0.2, 0, def.color, isArchitect);
-      addBox(group, w, h * 0.15, d * 0.08, 0, h * 0.475, -d * 0.46, def.accent, isArchitect);
-      addBox(group, w * 0.9, h * 0.12, d * 0.85, 0, h * 0.46, 0, '#ffffff', isArchitect);
+    case 'bed_single':
+    case 'bed_double':
+      buildBed(group, w, h, d, def, isArchitect);
       break;
     case 'chair':
       addBox(group, w, h * 0.05, d, 0, h * 0.45, 0, def.color, isArchitect);
@@ -404,6 +436,9 @@ export function createFurnitureMesh(type, mode = 'preview') {
     case 'lamp_small':
       buildLampSmall(group, w, h, d, def, isArchitect);
       break;
+    case 'wardrobe':
+      buildWardrobe(group, w, h, d, def, isArchitect);
+      break;
     case 'nightstand':
       addBox(group, w, h * 0.85, d, 0, h * 0.425, 0, def.color, isArchitect);
       addBox(group, w * 0.9, h * 0.08, d * 0.85, 0, h * 0.89, 0, def.accent, isArchitect);
@@ -428,6 +463,127 @@ export function createFurnitureMesh(type, mode = 'preview') {
   }
 
   return group;
+}
+
+function addPillow(group, x, y, z, pw, ph, pd, architect) {
+  addBox(group, pw, ph, pd, x, y, z, '#ffffff', architect);
+  addBox(group, pw * 0.88, ph * 0.18, pd * 0.82, x, y + ph * 0.22, z + pd * 0.04, '#f0f0f0', architect);
+}
+
+function buildBed(group, w, h, d, def, architect) {
+  const pillows = def.pillows ?? 2;
+  const frameH = h * 0.2;
+  const mattressH = h * 0.17;
+  const duvetH = h * 0.13;
+  const pillowH = h * 0.09;
+  const baseY = frameH * 0.5;
+  const mattressY = frameH + mattressH * 0.5;
+  const beddingTop = frameH + mattressH;
+  const headZ = -d * 0.42;
+
+  addBox(group, w, frameH, d, 0, baseY, 0, def.accent, architect);
+  addBox(group, w * 0.96, mattressH, d * 0.96, 0, mattressY, 0, def.color, architect);
+  addBox(group, w * 0.94, 0.018, d * 0.92, 0, beddingTop + 0.01, 0, def.sheet ?? '#f8f8f8', architect);
+
+  const duvetD = d * 0.6;
+  const duvetZ = d * 0.14;
+  addBox(
+    group,
+    w * 0.86,
+    duvetH,
+    duvetD,
+    0,
+    beddingTop + duvetH * 0.5 + 0.02,
+    duvetZ,
+    def.duvet ?? '#c5d4e8',
+    architect
+  );
+  addBox(
+    group,
+    w * 0.7,
+    duvetH * 0.35,
+    duvetD * 0.55,
+    0,
+    beddingTop + duvetH * 0.75,
+    duvetZ - duvetD * 0.12,
+    def.duvet ?? '#c5d4e8',
+    architect
+  );
+
+  addBox(group, w, h * 0.38, d * 0.07, 0, frameH + h * 0.2, -d * 0.465, def.accent, architect);
+  addBox(group, w * 0.92, h * 0.06, d * 0.04, 0, frameH + h * 0.38, -d * 0.44, '#a08060', architect);
+
+  const legH = frameH * 0.55;
+  const legW = 0.05;
+  const legInsetX = w * 0.42;
+  const legInsetZ = d * 0.44;
+  for (const [lx, lz] of [
+    [-legInsetX, -legInsetZ],
+    [legInsetX, -legInsetZ],
+    [-legInsetX, legInsetZ],
+    [legInsetX, legInsetZ],
+  ]) {
+    addBox(group, legW, legH, legW, lx, legH * 0.5, lz, '#654321', architect);
+  }
+
+  if (pillows === 1) {
+    addPillow(group, 0, beddingTop + pillowH * 0.5, headZ, w * 0.52, pillowH, d * 0.11, architect);
+  } else {
+    addPillow(group, -w * 0.24, beddingTop + pillowH * 0.5, headZ, w * 0.38, pillowH, d * 0.11, architect);
+    addPillow(group, w * 0.24, beddingTop + pillowH * 0.5, headZ, w * 0.38, pillowH, d * 0.11, architect);
+  }
+}
+
+function addFoldedClothes(group, x, y, z, architect, color) {
+  addBox(group, 0.16, 0.038, 0.11, x, y + 0.02, z, color, architect);
+  addBox(group, 0.15, 0.032, 0.1, x, y + 0.052, z + 0.008, color, architect);
+  addBox(group, 0.14, 0.028, 0.095, x, y + 0.078, z, color, architect);
+}
+
+function addHangingShirt(group, x, rodY, z, shirtH, shirtW, color, architect) {
+  addBox(group, shirtW, shirtH, 0.022, x, rodY - shirtH * 0.5 - 0.02, z, color, architect);
+  addBox(group, shirtW * 1.15, shirtH * 0.07, 0.028, x, rodY - 0.025, z, color, architect);
+  addBox(group, shirtW * 0.35, 0.02, 0.015, x, rodY + 0.01, z, '#c0c0c0', architect);
+}
+
+function buildWardrobe(group, w, h, d, def, architect) {
+  const side = 0.04;
+  const shelfT = 0.03;
+  const inset = 0.03;
+  const innerW = w - side * 2;
+  const innerD = d - inset * 1.6;
+  const itemZ = inset * 0.35;
+
+  buildShelfCarcass(group, w, h, d, def, architect);
+
+  const upperShelfY = h * 0.76;
+  addBox(group, innerW, shelfT, innerD, 0, upperShelfY, itemZ, def.shelf ?? def.accent, architect);
+
+  const stackY = upperShelfY + shelfT;
+  addFoldedClothes(group, -innerW * 0.28, stackY, itemZ, architect, '#6b8e9e');
+  addFoldedClothes(group, -innerW * 0.02, stackY, itemZ + innerD * 0.08, architect, '#c87858');
+  addFoldedClothes(group, innerW * 0.26, stackY, itemZ, architect, '#8b9e6b');
+
+  addBox(group, 0.12, 0.05, 0.08, innerW * 0.32, stackY + 0.04, itemZ - innerD * 0.1, '#e8e0d4', architect);
+  addBox(group, 0.1, 0.04, 0.07, innerW * 0.32, stackY + 0.085, itemZ - innerD * 0.1, '#f0f0f0', architect);
+
+  const rodY = h * 0.6;
+  addBox(group, innerW * 0.88, 0.022, 0.022, 0, rodY, itemZ + innerD * 0.15, '#b0b0b0', architect);
+
+  const shirtColors = ['#f5f5f5', '#c5d4e8', '#e8d0d8', '#d8e8f0', '#f0e8d8', '#ffffff'];
+  const shirtCount = 6;
+  for (let i = 0; i < shirtCount; i++) {
+    const x = -innerW * 0.38 + (i * innerW * 0.76) / (shirtCount - 1);
+    const shirtH = rodY - h * 0.2;
+    const shirtW = innerW * 0.1;
+    const zOff = itemZ + ((i % 3) - 1) * 0.02;
+    addHangingShirt(group, x, rodY, zOff, shirtH, shirtW, shirtColors[i % shirtColors.length], architect);
+  }
+
+  addBox(group, innerW, shelfT, innerD * 0.55, 0, h * 0.12, itemZ, def.shelf ?? def.accent, architect);
+  addBox(group, innerW * 0.35, 0.08, innerD * 0.4, -innerW * 0.2, h * 0.16, itemZ, '#5c4033', architect);
+
+  addCabinetDoors(group, w, h, d, def, architect, { double: true });
 }
 
 function buildBookshelf(group, w, h, d, def, architect) {

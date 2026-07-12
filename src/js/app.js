@@ -1004,6 +1004,11 @@ export class BytPlannerApp {
       this.doorOpenToggle.textContent = open ? '🔒 Zavřít okno' : '🪟 Otevřít okno';
       this.root.querySelector('#door-open-hint').textContent =
         'Vyklopí křídlo okna · klávesa O';
+    } else if (item.userData.furnitureType === 'wardrobe') {
+      this.openableOptionsTitle.textContent = 'Skříň na oblečení';
+      this.doorOpenToggle.textContent = open ? '🔒 Zavřít dvířka' : '🗄️ Otevřít dvířka';
+      this.root.querySelector('#door-open-hint').textContent =
+        'Ukáže nebo skryje oblečení ve skříni · klávesa O';
     } else if (isShelfCabinetType(item.userData.furnitureType)) {
       this.openableOptionsTitle.textContent = 'Skříňka';
       this.doorOpenToggle.textContent = open ? '🔒 Zavřít dvířka' : '🗄️ Otevřít dvířka';
