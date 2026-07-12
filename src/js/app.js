@@ -12,7 +12,7 @@ import {
   shiftWallsToPlot,
   shiftFurnitureToPlot,
 } from './apartments.js';
-import { FURNITURE_CATALOG, CATALOG_CATEGORIES, isDoorType, isOpenableType, isShelfCabinetType, isCarpetType, CARPET_SHAPES, CARPET_STYLE_DEFAULTS, getCarpetPatternsForType, rebuildCarpetGroup, applyDoorOpenState, getFurnitureMountOffset } from './furniture.js';
+import { FURNITURE_CATALOG, CATALOG_CATEGORIES, isDoorType, isWallGapType, isOpenableType, isShelfCabinetType, isCarpetType, CARPET_SHAPES, CARPET_STYLE_DEFAULTS, getCarpetPatternsForType, rebuildCarpetGroup, applyDoorOpenState, getFurnitureMountOffset } from './furniture.js';
 import { SceneManager } from './scene.js';
 import { loadSave, writeSave, clearSave } from './storage.js';
 
@@ -1032,7 +1032,7 @@ export class BytPlannerApp {
       yOff,
       snapped.z * GRID_SIZE
     );
-    if (isDoorType(this.selectedFurniture.userData.furnitureType)) {
+    if (isWallGapType(this.selectedFurniture.userData.furnitureType)) {
       this.scene.refreshWallOpenings();
     }
   }
@@ -1355,7 +1355,7 @@ export class BytPlannerApp {
 
     const next = !this.selectedFurniture.userData.doorOpen;
     applyDoorOpenState(this.selectedFurniture, next);
-    if (isDoorType(this.selectedFurniture.userData.furnitureType)) {
+    if (isWallGapType(this.selectedFurniture.userData.furnitureType)) {
       this.scene.refreshWallOpenings();
     }
     this.updateDoorOptionsPanel();
@@ -1408,7 +1408,7 @@ export class BytPlannerApp {
 
   removeFurnitureObject(obj) {
     if (!obj) return;
-    const wasDoor = isDoorType(obj.userData.furnitureType);
+    const wasWallGap = isWallGapType(obj.userData.furnitureType);
     obj.traverse((c) => {
       if (c.geometry) c.geometry.dispose();
       if (c.material) c.material.dispose();
@@ -1416,7 +1416,7 @@ export class BytPlannerApp {
     this.scene.furnitureGroup.remove(obj);
     if (this.cursorFollowFurniture === obj) this.cursorFollowFurniture = null;
     if (this.selectedFurniture === obj) this.selectedFurniture = null;
-    if (wasDoor) this.scene.refreshWallOpenings();
+    if (wasWallGap) this.scene.refreshWallOpenings();
     this.updateDoorOptionsPanel();
     this.updateCarpetOptionsPanel();
   }
@@ -1520,7 +1520,7 @@ export class BytPlannerApp {
     if (!this.selectedFurniture || this.mode !== 'architect') return;
     if (!this.selectedFurniture.userData.rotatable) return;
     this.selectedFurniture.rotation.y += Math.PI / 2;
-    if (isDoorType(this.selectedFurniture.userData.furnitureType)) {
+    if (isWallGapType(this.selectedFurniture.userData.furnitureType)) {
       this.scene.refreshWallOpenings();
     }
     this.scheduleSave();

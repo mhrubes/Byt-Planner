@@ -6,6 +6,7 @@ import {
   updateFurnitureMaterials,
   FURNITURE_CATALOG,
   isDoorType,
+  isWallGapType,
   isOpenableType,
   isCarpetType,
   applyDoorOpenState,
@@ -363,8 +364,8 @@ export class SceneManager {
 
     const isPreview = this.mode === 'preview';
 
-    const doors = this.furnitureGroup.children
-      .filter((f) => isDoorType(f.userData.furnitureType))
+    const openings = this.furnitureGroup.children
+      .filter((f) => isWallGapType(f.userData.furnitureType))
       .map((f) => ({
         type: f.userData.furnitureType,
         x: f.position.x / GRID_SIZE,
@@ -374,21 +375,26 @@ export class SceneManager {
 
     const wallsToRender = applyDoorGaps(
       this.walls,
-      doors,
+      openings,
       FURNITURE_CATALOG,
       GRID_SIZE
     );
 
     for (const w of wallsToRender) {
-      const role = classifyDoorWallSegment(w, doors, FURNITURE_CATALOG, GRID_SIZE);
+      const role = classifyDoorWallSegment(w, openings, FURNITURE_CATALOG, GRID_SIZE);
       if (role === 'inside') continue;
       const mesh = this.createWallMesh(w, isPreview);
       if (mesh) this.wallsGroup.add(mesh);
     }
 
-    for (const door of doors) {
-      const lintel = this.createDoorLintel(door, isPreview);
-      if (lintel) this.wallsGroup.add(lintel);
+    for (const opening of openings) {
+      if (opening.type === 'window') {
+        const infills = this.createWindowWallInfills(opening, isPreview);
+        infills.forEach((mesh) => this.wallsGroup.add(mesh));
+      } else {
+        const lintel = this.createDoorLintel(opening, isPreview);
+        if (lintel) this.wallsGroup.add(lintel);
+      }
     }
 
     this.updateWallSelectionHighlight();
@@ -482,6 +488,77 @@ export class SceneManager {
     return mesh;
   }
 
+  createWindowWallInfills(opening, isPreview) {
+    const def = FURNITURE_CATALOG[opening.type];
+    if (!def) return [];
+
+    const sill = def.sillHeight ?? 0.9;
+    const winH = def.size.h;
+    const winW = def.size.w;
+    const px = opening.x * GRID_SIZE;
+    const pz = opening.z * GRID_SIZE;
+    const r = opening.rotation ?? 0;
+    const parentWall = findWallForDoor(opening, this.walls, FURNITURE_CATALOG, GRID_SIZE);
+    const colorSegment = parentWall ?? {
+      x1: opening.x,
+      z1: opening.z,
+      x2: opening.x,
+      z2: opening.z,
+    };
+
+    const meshes = [];
+
+    if (sill > 0.04) {
+      const geo = new THREE.BoxGeometry(winW, sill, WALL_THICKNESS);
+      const mat = isPreview
+        ? new THREE.MeshStandardMaterial({
+            color: this.resolveWallColor(colorSegment),
+            roughness: 0.9,
+            metalness: 0,
+          })
+        : new THREE.MeshLambertMaterial({
+            color: 0xd4d8e0,
+            transparent: true,
+            opacity: 0.92,
+          });
+      const sillMesh = new THREE.Mesh(geo, mat);
+      sillMesh.position.set(px, sill / 2, pz);
+      sillMesh.rotation.y = r;
+      sillMesh.castShadow = isPreview;
+      sillMesh.receiveShadow = isPreview;
+      sillMesh.userData.isWall = true;
+      sillMesh.userData.wallSegment = { ...colorSegment };
+      meshes.push(sillMesh);
+    }
+
+    const top = sill + winH;
+    const lintelH = WALL_HEIGHT - top;
+    if (lintelH > 0.04) {
+      const geo = new THREE.BoxGeometry(winW, lintelH, WALL_THICKNESS);
+      const mat = isPreview
+        ? new THREE.MeshStandardMaterial({
+            color: this.resolveWallColor(colorSegment),
+            roughness: 0.9,
+            metalness: 0,
+          })
+        : new THREE.MeshLambertMaterial({
+            color: 0xd4d8e0,
+            transparent: true,
+            opacity: 0.92,
+          });
+      const lintelMesh = new THREE.Mesh(geo, mat);
+      lintelMesh.position.set(px, top + lintelH / 2, pz);
+      lintelMesh.rotation.y = r;
+      lintelMesh.castShadow = isPreview;
+      lintelMesh.receiveShadow = isPreview;
+      lintelMesh.userData.isWall = true;
+      lintelMesh.userData.wallSegment = { ...colorSegment };
+      meshes.push(lintelMesh);
+    }
+
+    return meshes;
+  }
+
   clearFurniture() {
     while (this.furnitureGroup.children.length) {
       const f = this.furnitureGroup.children[0];
@@ -518,7 +595,7 @@ export class SceneManager {
       applyDoorOpenState(mesh, doorOpen);
     }
     this.furnitureGroup.add(mesh);
-    if (isDoorType(type)) this.refreshWallOpenings();
+    if (isWallGapType(type)) this.refreshWallOpenings();
     return mesh;
   }
 

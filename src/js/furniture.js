@@ -450,6 +450,7 @@ export const CATALOG_CATEGORIES = [
 export const FURNITURE_CATALOG = { ...FURNITURE_ITEMS };
 
 export const DOOR_TYPES = new Set(['door', 'balcony_door']);
+export const WALL_GAP_TYPES = new Set(['door', 'balcony_door', 'window']);
 export const SHELF_CABINET_TYPES = new Set([
   'shelf_small_cabinet',
   'shelf_medium_cabinet',
@@ -501,6 +502,10 @@ export function getFurnitureMountOffset(type) {
 
 export function isDoorType(type) {
   return DOOR_TYPES.has(type);
+}
+
+export function isWallGapType(type) {
+  return WALL_GAP_TYPES.has(type);
 }
 
 export function isShelfCabinetType(type) {
@@ -1553,24 +1558,33 @@ function buildPlantLarge(group, w, h, d, def, architect) {
   addSphere(group, w * 0.2, h * 0.58, def.color, architect, { x: -w * 0.05, z: w * 0.05 });
 }
 
+function addHollowOpeningFrame(group, w, h, d, accent, trim, architect, {
+  frameW = 0.07,
+  bottomH = null,
+  centerY = null,
+} = {}) {
+  const depth = Math.max(d * 0.92, 0.14);
+  const cy = centerY ?? h * 0.5;
+  const bh = bottomH ?? frameW * 0.7;
+  const frameOpts = (role = 'frame') => ({
+    keepColor: true,
+    partRole: role,
+    doubleSided: true,
+  });
+
+  addBox(group, frameW, h, depth, -w * 0.5 + frameW * 0.5, cy, 0, accent, architect, frameOpts());
+  addBox(group, frameW, h, depth, w * 0.5 - frameW * 0.5, cy, 0, accent, architect, frameOpts());
+  addBox(group, w, frameW, depth, 0, cy + h * 0.5 - frameW * 0.5, 0, trim, architect, frameOpts());
+  addBox(group, w, bh, depth, 0, cy - h * 0.5 + bh * 0.5, 0, trim, architect, frameOpts());
+}
+
 function buildDoor(group, w, h, d, def, architect) {
   const frame = 0.07;
   const leafW = w - frame * 2;
   const leafH = h - frame * 2;
   const leafD = Math.max(d * 0.95, 0.14);
 
-  addBox(group, w + 0.06, h + 0.06, d * 0.9, 0, h * 0.5, 0, def.accent, architect, {
-    keepColor: true,
-    emissive: '#8a8078',
-    partRole: 'frame',
-    doubleSided: true,
-  });
-  addBox(group, w + 0.02, h + 0.02, d * 0.92, 0, h * 0.5, 0, '#5c4033', architect, {
-    keepColor: true,
-    emissive: '#2a1810',
-    partRole: 'frame',
-    doubleSided: true,
-  });
+  addHollowOpeningFrame(group, w, h, d, def.accent, '#5c4033', architect);
 
   const leafPivot = new THREE.Group();
   leafPivot.position.set(-w * 0.5 + frame, h * 0.5, 0);
@@ -1594,32 +1608,14 @@ function buildDoor(group, w, h, d, def, architect) {
     partRole: 'leaf-back',
     doubleSided: true,
   });
-  addBox(group, 0.05, 0.14, 0.06, w * 0.38, h * 0.52, leafD * 0.45, '#e6b422', architect, {
+  addBox(leafPivot, 0.05, 0.14, 0.06, leafW * 0.82, 0, leafD * 0.45, '#e6b422', architect, {
     keepColor: true,
     emissive: '#806010',
     partRole: 'handle',
     doubleSided: true,
   });
-
-  addPassageMarker(group, w, architect);
 }
 
-function addPassageMarker(group, width, architect) {
-  const geo = new THREE.PlaneGeometry(width * 0.9, width * 0.55);
-  const mat = makeMaterial('#4ade80', architect, { keepColor: true });
-  mat.transparent = true;
-  mat.opacity = architect ? 0.55 : 0.4;
-  mat.side = THREE.DoubleSide;
-  const plane = new THREE.Mesh(geo, mat);
-  plane.rotation.x = -Math.PI / 2;
-  plane.position.set(0, 0.025, 0.18);
-  plane.visible = false;
-  plane.userData.partRole = 'passage';
-  plane.userData.isFurniturePart = true;
-  plane.userData.partColor = '#4ade80';
-  plane.userData.keepColor = true;
-  group.add(plane);
-}
 
 function buildBalconyDoor(group, w, h, d, def, architect) {
   const frame = 0.07;
@@ -1627,12 +1623,7 @@ function buildBalconyDoor(group, w, h, d, def, architect) {
   const panelW = (w - frame * 3) / 2;
   const leafD = Math.max(d * 0.95, 0.14);
 
-  addBox(group, w + 0.06, h + 0.06, d * 0.9, 0, h * 0.5, 0, def.accent, architect, {
-    keepColor: true,
-    emissive: '#0d4a35',
-    partRole: 'frame',
-    doubleSided: true,
-  });
+  addHollowOpeningFrame(group, w, h, d, def.accent, '#1a4a38', architect);
 
   const leftPivot = new THREE.Group();
   leftPivot.position.set(-w * 0.5 + frame, h * 0.5, 0);
@@ -1667,19 +1658,12 @@ function buildBalconyDoor(group, w, h, d, def, architect) {
     partRole: 'leaf-back',
     doubleSided: true,
   });
-  addBox(group, 0.05, innerH, d * 0.28, 0, h * 0.5, leafD * 0.42, def.accent, architect, {
-    keepColor: true,
-    partRole: 'frame',
-    doubleSided: true,
-  });
-  addBox(group, 0.05, 0.12, 0.05, w * 0.42, h * 0.55, leafD * 0.45, '#e6b422', architect, {
+  addBox(leftPivot, 0.05, 0.12, 0.05, panelW * 0.82, 0, leafD * 0.45, '#e6b422', architect, {
     keepColor: true,
     emissive: '#806010',
     partRole: 'handle',
     doubleSided: true,
   });
-
-  addPassageMarker(group, w, architect);
 }
 
 function buildWindow(group, w, h, d, def, architect) {
@@ -1690,17 +1674,9 @@ function buildWindow(group, w, h, d, def, architect) {
   const glassH = h - frame * 2;
   const winD = Math.max(d * 1.1, 0.18);
 
-  addBox(group, w + 0.08, h + frame * 2 + 0.04, winD * 0.95, 0, cy, 0, def.accent, architect, {
-    keepColor: true,
-    emissive: '#1a5080',
-    partRole: 'frame',
-    doubleSided: true,
-  });
-  addBox(group, w + 0.02, h + 0.02, winD * 0.92, 0, cy, 0, def.color, architect, {
-    keepColor: true,
-    emissive: '#aaccee',
-    partRole: 'frame',
-    doubleSided: true,
+  addHollowOpeningFrame(group, w, h, winD, def.accent, def.color, architect, {
+    centerY: cy,
+    bottomH: 0.08,
   });
 
   const sashPivot = new THREE.Group();
@@ -1719,16 +1695,6 @@ function buildWindow(group, w, h, d, def, architect) {
     partRole: 'sash',
   });
 
-  addBox(group, 0.05, glassH, winD * 0.55, 0, cy, winD * 0.22, def.color, architect, {
-    keepColor: true,
-    partRole: 'frame',
-    doubleSided: true,
-  });
-  addBox(group, glassW, 0.05, winD * 0.55, 0, cy, winD * 0.22, def.color, architect, {
-    keepColor: true,
-    partRole: 'frame',
-    doubleSided: true,
-  });
   addBox(group, glassW * 0.9, glassH * 0.9, 0.025, 0, cy, -winD * 0.48, def.back ?? def.inner, architect, {
     keepColor: true,
     emissive: '#5577aa',
@@ -2672,16 +2638,16 @@ export function applyDoorOpenState(group, open) {
   group.traverse((child) => {
     const role = child.userData.partRole;
     if (role === 'leaf-pivot') {
-      child.rotation.y = open ? Math.PI * 0.45 : 0;
+      child.rotation.y = open ? Math.PI * 0.48 : 0;
     }
     if (role === 'leaf-left-pivot') {
-      child.rotation.y = open ? -Math.PI * 0.42 : 0;
+      child.rotation.y = open ? -Math.PI * 0.45 : 0;
     }
     if (role === 'leaf-right-pivot') {
-      child.rotation.y = open ? Math.PI * 0.42 : 0;
+      child.rotation.y = open ? Math.PI * 0.45 : 0;
     }
     if (role === 'sash-pivot') {
-      child.rotation.y = open ? Math.PI * 0.38 : 0;
+      child.rotation.y = open ? Math.PI * 0.42 : 0;
     }
     if (role === 'cabinet-door-pivot') {
       child.rotation.y = open ? -Math.PI * 0.5 : 0;
@@ -2696,7 +2662,7 @@ export function applyDoorOpenState(group, open) {
       child.rotation.x = open ? -Math.PI * 0.52 : 0;
     }
     if (role === 'passage') {
-      child.visible = open;
+      child.visible = false;
     }
     if (role === 'handle') {
       child.visible = !open;
