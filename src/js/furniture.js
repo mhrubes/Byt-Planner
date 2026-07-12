@@ -6,8 +6,10 @@ const FURNITURE_ITEMS = {
     label: 'Dveře',
     icon: '🚪',
     size: { w: 0.9, h: 2.1, d: 0.12 },
-    color: '#c87832',
-    accent: '#4a3728',
+    color: '#f0a040',
+    accent: '#faf6f0',
+    inner: '#c87832',
+    back: '#e87830',
     structural: true,
   },
   window: {
@@ -23,8 +25,10 @@ const FURNITURE_ITEMS = {
     label: 'Balkónové dveře',
     icon: '🏠',
     size: { w: 1.8, h: 2.1, d: 0.12 },
-    color: '#eef2f6',
+    color: '#dce8f8',
     accent: '#1b9e77',
+    inner: '#b8cce0',
+    back: '#c5daf0',
     structural: true,
   },
   radiator: {
@@ -289,31 +293,48 @@ function buildDoor(group, w, h, d, def, architect) {
   const frame = 0.07;
   const leafW = w - frame * 2;
   const leafH = h - frame * 2;
+  const leafD = Math.max(d * 0.95, 0.14);
 
-  addBox(group, w + 0.04, h + 0.04, d * 0.45, 0, h * 0.5, 0, def.accent, architect, {
+  addBox(group, w + 0.06, h + 0.06, d * 0.9, 0, h * 0.5, 0, def.accent, architect, {
+    keepColor: true,
+    emissive: '#8a8078',
+    partRole: 'frame',
+    doubleSided: true,
+  });
+  addBox(group, w + 0.02, h + 0.02, d * 0.92, 0, h * 0.5, 0, '#5c4033', architect, {
     keepColor: true,
     emissive: '#2a1810',
     partRole: 'frame',
+    doubleSided: true,
   });
 
   const leafPivot = new THREE.Group();
-  leafPivot.position.set(-w * 0.5 + frame, h * 0.5, d * 0.18);
+  leafPivot.position.set(-w * 0.5 + frame, h * 0.5, 0);
   leafPivot.userData.partRole = 'leaf-pivot';
   group.add(leafPivot);
 
-  addBox(leafPivot, leafW, leafH, d * 0.55, leafW * 0.5, 0, 0, def.color, architect, {
+  addBox(leafPivot, leafW, leafH, leafD, leafW * 0.5, 0, 0, def.color, architect, {
     keepColor: true,
-    emissive: '#6b3a12',
+    emissive: '#c06018',
     partRole: 'leaf',
+    doubleSided: true,
   });
-  addBox(leafPivot, leafW * 0.12, leafH * 0.55, 0.025, leafW * 0.92, 0, d * 0.24, '#5a3820', architect, {
+  addBox(leafPivot, leafW * 0.12, leafH * 0.55, 0.03, leafW * 0.88, 0, leafD * 0.42, def.inner ?? '#c87832', architect, {
     keepColor: true,
     partRole: 'leaf',
+    doubleSided: true,
   });
-  addBox(group, 0.05, 0.14, 0.06, w * 0.38, h * 0.52, d * 0.38, '#e6b422', architect, {
+  addBox(group, leafW * 0.9, leafH * 0.9, 0.025, 0, h * 0.5, -leafD * 0.48, def.back ?? def.color, architect, {
+    keepColor: true,
+    emissive: '#b05820',
+    partRole: 'leaf-back',
+    doubleSided: true,
+  });
+  addBox(group, 0.05, 0.14, 0.06, w * 0.38, h * 0.52, leafD * 0.45, '#e6b422', architect, {
     keepColor: true,
     emissive: '#806010',
     partRole: 'handle',
+    doubleSided: true,
   });
 
   addPassageMarker(group, w, architect);
@@ -340,31 +361,35 @@ function buildBalconyDoor(group, w, h, d, def, architect) {
   const frame = 0.07;
   const innerH = h - frame * 2;
   const panelW = (w - frame * 3) / 2;
+  const leafD = Math.max(d * 0.95, 0.14);
 
-  addBox(group, w + 0.04, h + 0.04, d * 0.45, 0, h * 0.5, 0, def.accent, architect, {
+  addBox(group, w + 0.06, h + 0.06, d * 0.9, 0, h * 0.5, 0, def.accent, architect, {
     keepColor: true,
     emissive: '#0d4a35',
     partRole: 'frame',
+    doubleSided: true,
   });
 
   const leftPivot = new THREE.Group();
-  leftPivot.position.set(-w * 0.5 + frame, h * 0.5, d * 0.2);
+  leftPivot.position.set(-w * 0.5 + frame, h * 0.5, 0);
   leftPivot.userData.partRole = 'leaf-left-pivot';
   group.add(leftPivot);
-  addBox(leftPivot, panelW, innerH, d * 0.5, panelW * 0.5, 0, 0, def.color, architect, {
+  addBox(leftPivot, panelW, innerH, leafD, panelW * 0.5, 0, 0, def.color, architect, {
     keepColor: true,
-    emissive: '#334455',
+    emissive: '#4a7090',
     partRole: 'leaf',
+    doubleSided: true,
   });
 
   const rightPivot = new THREE.Group();
-  rightPivot.position.set(w * 0.5 - frame, h * 0.5, d * 0.2);
+  rightPivot.position.set(w * 0.5 - frame, h * 0.5, 0);
   rightPivot.userData.partRole = 'leaf-right-pivot';
   group.add(rightPivot);
-  addBox(rightPivot, panelW, innerH, d * 0.5, -panelW * 0.5, 0, 0, def.color, architect, {
+  addBox(rightPivot, panelW, innerH, leafD, -panelW * 0.5, 0, 0, def.color, architect, {
     keepColor: true,
-    emissive: '#334455',
+    emissive: '#4a7090',
     partRole: 'leaf',
+    doubleSided: true,
   });
   addBox(rightPivot, panelW * 0.75, innerH * 0.58, d * 0.22, -panelW * 0.38, innerH * 0.12, d * 0.08, '#7ec8ff', architect, {
     keepColor: true,
@@ -372,14 +397,22 @@ function buildBalconyDoor(group, w, h, d, def, architect) {
     partRole: 'leaf',
   });
 
-  addBox(group, 0.05, innerH, d * 0.28, 0, h * 0.5, d * 0.24, def.accent, architect, {
+  addBox(group, w * 0.88, innerH * 0.88, 0.025, 0, h * 0.5, -leafD * 0.48, def.back ?? def.color, architect, {
+    keepColor: true,
+    emissive: '#3a6890',
+    partRole: 'leaf-back',
+    doubleSided: true,
+  });
+  addBox(group, 0.05, innerH, d * 0.28, 0, h * 0.5, leafD * 0.42, def.accent, architect, {
     keepColor: true,
     partRole: 'frame',
+    doubleSided: true,
   });
-  addBox(group, 0.05, 0.12, 0.05, w * 0.42, h * 0.55, d * 0.35, '#e6b422', architect, {
+  addBox(group, 0.05, 0.12, 0.05, w * 0.42, h * 0.55, leafD * 0.45, '#e6b422', architect, {
     keepColor: true,
     emissive: '#806010',
     partRole: 'handle',
+    doubleSided: true,
   });
 
   addPassageMarker(group, w, architect);
@@ -443,17 +476,18 @@ function buildBathtub(group, w, h, d, def, architect) {
   addBox(group, w, h * 0.12, d * 0.08, 0, h * 0.56, -d * 0.46, def.accent, architect);
 }
 
-function makeMaterial(color, architect, { isGlass = false, emissive = null, keepColor = false } = {}) {
+function makeMaterial(color, architect, { isGlass = false, emissive = null, keepColor = false, doubleSided = false } = {}) {
   if (architect && !keepColor) {
     return new THREE.MeshLambertMaterial({
       color: isGlass ? 0x88aacc : 0x8899aa,
       transparent: true,
       opacity: isGlass ? 0.6 : 0.85,
+      side: doubleSided ? THREE.DoubleSide : THREE.FrontSide,
     });
   }
 
   if (isGlass) {
-    return new THREE.MeshPhysicalMaterial({
+    const glassMat = new THREE.MeshPhysicalMaterial({
       color: typeof color === 'string' ? color : 0x7ec8ff,
       transparent: true,
       opacity: 0.42,
@@ -464,17 +498,19 @@ function makeMaterial(color, architect, { isGlass = false, emissive = null, keep
       ior: 1.45,
       side: THREE.DoubleSide,
     });
+    return glassMat;
   }
 
   const mat = new THREE.MeshStandardMaterial({
     color,
-    roughness: architect ? 0.55 : 0.65,
+    roughness: architect ? 0.5 : 0.65,
     metalness: 0.04,
+    side: doubleSided ? THREE.DoubleSide : THREE.FrontSide,
   });
 
   if (emissive) {
     mat.emissive = new THREE.Color(emissive);
-    mat.emissiveIntensity = architect ? 0.35 : 0.12;
+    mat.emissiveIntensity = architect ? 0.45 : 0.12;
   }
 
   return mat;
@@ -492,6 +528,8 @@ function addBox(parent, w, h, d, x, y, z, color, architect, opts = {}) {
   mesh.userData.emissive = opts.emissive ?? null;
   mesh.userData.keepColor = opts.keepColor ?? false;
   mesh.userData.partRole = opts.partRole ?? null;
+  mesh.userData.doubleSided = opts.doubleSided ?? false;
+  if (opts.keepColor) mesh.renderOrder = 2;
   parent.add(mesh);
 }
 
@@ -539,6 +577,7 @@ export function updateFurnitureMaterials(group, mode) {
       isGlass: child.userData.isGlass,
       emissive: child.userData.emissive,
       keepColor: child.userData.keepColor,
+      doubleSided: child.userData.doubleSided,
     });
     child.castShadow = !architect || child.userData.keepColor;
     child.receiveShadow = !architect || child.userData.keepColor;
@@ -565,6 +604,9 @@ export function applyDoorOpenState(group, open) {
       child.visible = open;
     }
     if (role === 'handle') {
+      child.visible = !open;
+    }
+    if (role === 'leaf-back') {
       child.visible = !open;
     }
   });
