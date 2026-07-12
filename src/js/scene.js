@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { GRID_SIZE, WALL_HEIGHT, WALL_THICKNESS, applyOpenDoorGaps, carpetRectFromGrid, FURNITURE_GRID_SUBDIVISIONS } from './apartments.js';
+import { GRID_SIZE, WALL_HEIGHT, WALL_THICKNESS, applyOpenDoorGaps, carpetRectFromGrid, FURNITURE_GRID_SUBDIVISIONS, wallKey, findParentWall } from './apartments.js';
 import {
   createFurnitureMesh,
   updateFurnitureMaterials,
@@ -20,6 +20,8 @@ export class SceneManager {
     this.apartmentBounds = null;
     this.wallColor = '#f5f5f0';
     this.floorColor = '#c9b896';
+    this.wallColors = {};
+    this.selectedWallKey = null;
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x87a8c4);
@@ -140,6 +142,51 @@ export class SceneManager {
   setWallColor(color) {
     this.wallColor = color;
     if (this.mode === 'preview') this.rebuildWalls();
+  }
+
+  setWallColors(colors = {}) {
+    this.wallColors = { ...colors };
+    if (this.mode === 'preview') this.rebuildWalls();
+  }
+
+  getWallColors() {
+    return { ...this.wallColors };
+  }
+
+  getWallKeyForSegment(segment) {
+    return wallKey(findParentWall(segment, this.walls));
+  }
+
+  resolveWallColor(segment) {
+    const key = this.getWallKeyForSegment(segment);
+    return this.wallColors[key] ?? this.wallColor;
+  }
+
+  setWallSegmentColor(wallKeyValue, color) {
+    this.wallColors[wallKeyValue] = color;
+    if (this.mode === 'preview') this.rebuildWalls();
+  }
+
+  selectWall(wallKeyValue) {
+    this.selectedWallKey = wallKeyValue;
+    this.updateWallSelectionHighlight();
+  }
+
+  clearWallSelection() {
+    this.selectedWallKey = null;
+    this.updateWallSelectionHighlight();
+  }
+
+  updateWallSelectionHighlight() {
+    if (this.mode !== 'preview') return;
+
+    for (const mesh of this.wallsGroup.children) {
+      if (!mesh.isMesh || !mesh.material?.emissive) continue;
+      const key = this.getWallKeyForSegment(mesh.userData.wallSegment);
+      const selected = !!this.selectedWallKey && key === this.selectedWallKey;
+      mesh.material.emissive.setHex(selected ? 0x3366aa : 0x000000);
+      mesh.material.emissiveIntensity = selected ? 0.28 : 0;
+    }
   }
 
   setFloorColor(color) {
@@ -335,6 +382,8 @@ export class SceneManager {
       const mesh = this.createWallMesh(w, isPreview);
       if (mesh) this.wallsGroup.add(mesh);
     }
+
+    this.updateWallSelectionHighlight();
   }
 
   refreshWallOpenings() {
@@ -351,9 +400,11 @@ export class SceneManager {
 
     const mat = isPreview
       ? new THREE.MeshStandardMaterial({
-          color: this.wallColor,
+          color: this.resolveWallColor(w),
           roughness: 0.9,
           metalness: 0,
+          emissive: 0x000000,
+          emissiveIntensity: 0,
         })
       : new THREE.MeshLambertMaterial({
           color: 0xd4d8e0,
@@ -461,7 +512,7 @@ export class SceneManager {
   getIntersectables() {
     const list = [];
     this.furnitureGroup.children.forEach((f) => list.push(f));
-    if (this.mode === 'architect') {
+    if (this.mode === 'architect' || this.mode === 'preview') {
       this.wallsGroup.children.forEach((w) => list.push(w));
     }
     return list;

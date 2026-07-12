@@ -361,6 +361,42 @@ export function wallKey(w) {
   return `${w.x1},${w.z1}-${w.x2},${w.z2}`;
 }
 
+/** Je dílčí segment na stejné přímce jako celá zeď */
+export function segmentIsSubsetOf(piece, wall) {
+  const eps = 0.02;
+  const pw = normalizeWall(piece);
+  const ww = normalizeWall(wall);
+
+  const pdx = pw.x2 - pw.x1;
+  const pdz = pw.z2 - pw.z1;
+  const wdx = ww.x2 - ww.x1;
+  const wdz = ww.z2 - ww.z1;
+
+  const plen = Math.hypot(pdx, pdz);
+  const wlen = Math.hypot(wdx, wdz);
+  if (plen < eps || wlen < eps) return false;
+
+  if (Math.abs(pdx * wdz - pdz * wdx) > eps * wlen) return false;
+
+  const onWall = (px, pz) => {
+    const t = ((px - ww.x1) * wdx + (pz - ww.z1) * wdz) / (wlen * wlen);
+    if (t < -eps || t > 1 + eps) return false;
+    const cx = ww.x1 + t * wdx;
+    const cz = ww.z1 + t * wdz;
+    return Math.hypot(px - cx, pz - cz) < eps;
+  };
+
+  return onWall(pw.x1, pw.z1) && onWall(pw.x2, pw.z2);
+}
+
+/** Najde původní zeď, ze které vznikl dílčí segment (např. po otvoru ve dveřích) */
+export function findParentWall(segment, walls) {
+  for (const w of walls) {
+    if (segmentIsSubsetOf(segment, w)) return normalizeWall(w);
+  }
+  return normalizeWall(segment);
+}
+
 export function normalizeWall(w) {
   if (w.x1 > w.x2 || (w.x1 === w.x2 && w.z1 > w.z2)) {
     return { x1: w.x2, z1: w.z2, x2: w.x1, z2: w.z1 };

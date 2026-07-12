@@ -129,6 +129,7 @@ export class BytPlannerApp {
             <h3>Barva stěn</h3>
             <div class="color-picker-row" id="wall-colors"></div>
             <div class="color-custom-picker" id="wall-color-custom"></div>
+            <p class="save-hint" id="wall-color-hint">Klikni na zeď pro barvení jedné stěny · bez výběru se barví všechny bez vlastní barvy</p>
           </section>
 
           <section class="panel-section preview-only">
@@ -285,7 +286,13 @@ export class BytPlannerApp {
 
   applyWallColor(color) {
     const hex = this.normalizeHex(color);
-    this.scene.setWallColor(hex);
+
+    if (this.mode === 'preview' && this.scene.selectedWallKey) {
+      this.scene.setWallSegmentColor(this.scene.selectedWallKey, hex);
+    } else {
+      this.scene.setWallColor(hex);
+    }
+
     this.syncColorSelection('#wall-colors', this.wallColorPicker, hex);
     this.persistColors();
   }
@@ -300,6 +307,16 @@ export class BytPlannerApp {
   persistColors() {
     this.savedData.wallColor = this.scene.wallColor;
     this.savedData.floorColor = this.scene.floorColor;
+
+    if (this.currentApartment) {
+      if (!this.savedData.apartments) this.savedData.apartments = {};
+      const prev = this.savedData.apartments[this.currentApartment] ?? {};
+      this.savedData.apartments[this.currentApartment] = {
+        ...prev,
+        wallColors: this.scene.getWallColors(),
+      };
+    }
+
     writeSave(this.savedData);
   }
 
@@ -404,6 +421,7 @@ export class BytPlannerApp {
     this.savedData.apartments[this.currentApartment] = {
       walls: cloneWalls(this.walls),
       furniture: this.scene.getFurnitureState(),
+      wallColors: this.scene.getWallColors(),
     };
   }
 
@@ -567,6 +585,7 @@ export class BytPlannerApp {
     this.cancelPlacing();
     this.scene.clearWallPreview();
     this.clearSelection();
+    this.clearWallSelection();
 
     const layout = getPlotLayout(tpl.floorSize);
     this.plotLayout = layout;
@@ -586,6 +605,8 @@ export class BytPlannerApp {
       this.scene.setWalls(this.walls);
     }
 
+    this.scene.setWallColors(saved?.wallColors ?? {});
+
     if (saved?.furniture?.length) {
       this.scene.loadFurnitureFromState(saved.furniture);
     } else {
@@ -602,6 +623,7 @@ export class BytPlannerApp {
     });
 
     this.updateStatus();
+    this.updateWallSelectionUI();
     this.scheduleSave();
   }
 
@@ -612,6 +634,7 @@ export class BytPlannerApp {
     this.wallStart = null;
     this.cancelCursorFollow(true);
     this.clearSelection();
+    this.clearWallSelection();
 
     this.root.querySelectorAll('.mode-btn').forEach((btn) => {
       btn.classList.toggle('active', btn.dataset.mode === mode);
@@ -634,6 +657,7 @@ export class BytPlannerApp {
     this.updateSaveHintDefault();
     this.updateDoorOptionsPanel();
     this.updateCarpetOptionsPanel();
+    this.updateWallSelectionUI();
   }
 
   setTool(tool) {
@@ -885,6 +909,15 @@ export class BytPlannerApp {
 
     const hit = this.scene.raycast(e.clientX, e.clientY);
 
+    if (this.mode === 'preview') {
+      if (hit?.type === 'wall') {
+        this.selectWall(hit.object);
+      } else {
+        this.clearWallSelection();
+      }
+      return;
+    }
+
     if (this.mode === 'architect') {
       if (this.placingType) {
         if (isCarpetType(this.placingType)) {
@@ -1106,6 +1139,7 @@ export class BytPlannerApp {
   }
 
   selectFurniture(obj) {
+    this.clearWallSelection();
     this.clearSelectionHighlight();
     this.selectedFurniture = obj;
     if (!obj.userData.selectionRing) {
@@ -1327,6 +1361,37 @@ export class BytPlannerApp {
 
   clearSelection() {
     this.clearSelectionHighlight();
+  }
+
+  selectWall(wallMesh) {
+    const key = this.scene.getWallKeyForSegment(wallMesh.userData.wallSegment);
+    this.scene.selectWall(key);
+    const color = this.scene.wallColors[key] ?? this.scene.wallColor;
+    this.syncColorSelection('#wall-colors', this.wallColorPicker, color);
+    this.updateWallSelectionUI();
+  }
+
+  clearWallSelection() {
+    if (!this.scene.selectedWallKey) {
+      this.updateWallSelectionUI();
+      return;
+    }
+    this.scene.clearWallSelection();
+    this.syncColorSelection('#wall-colors', this.wallColorPicker, this.scene.wallColor);
+    this.updateWallSelectionUI();
+  }
+
+  updateWallSelectionUI() {
+    const hint = this.root.querySelector('#wall-color-hint');
+    if (!hint) return;
+
+    if (this.mode === 'preview' && this.scene.selectedWallKey) {
+      hint.textContent = 'Vybraná zeď — barva platí jen pro ni · klikni mimo pro zrušení';
+      hint.dataset.state = 'pending';
+    } else {
+      hint.textContent = 'Klikni na zeď pro barvení jedné stěny · bez výběru se barví všechny bez vlastní barvy';
+      hint.dataset.state = '';
+    }
   }
 
   removeFurnitureObject(obj) {
