@@ -18,7 +18,7 @@ import {
   snapOpeningRotationToWall,
   isOpeningOnWall,
 } from './apartments.js';
-import { FURNITURE_CATALOG, CATALOG_CATEGORIES, isDoorType, isWallGapType, isOpenableType, isShelfCabinetType, isCarpetType, CARPET_SHAPES, CARPET_STYLE_DEFAULTS, getCarpetPatternsForType, rebuildCarpetGroup, applyDoorOpenState, getFurnitureMountOffset } from './furniture.js';
+import { FURNITURE_CATALOG, CATALOG_CATEGORIES, isDoorType, isWallGapType, isOpenableType, isShelfCabinetType, isCarpetType, isTvType, usesWallSnap, TV_STYLES, TV_STYLE_DEFAULTS, CARPET_SHAPES, CARPET_STYLE_DEFAULTS, getCarpetPatternsForType, rebuildCarpetGroup, rebuildTvGroup, applyDoorOpenState, getFurnitureMountOffset } from './furniture.js';
 import { SceneManager } from './scene.js';
 import { loadSave, writeSave, clearSave } from './storage.js';
 
@@ -40,6 +40,7 @@ export class BytPlannerApp {
     this.carpetDragEnd = null;
     this.isCarpetDrag = false;
     this.carpetStyleDefaults = structuredClone(CARPET_STYLE_DEFAULTS);
+    this.tvStyleDefaults = { ...TV_STYLE_DEFAULTS };
     this.wallSnap45 = false;
     this.furnitureClipboard = null;
     this.cursorFollowFurniture = null;
@@ -133,6 +134,12 @@ export class BytPlannerApp {
                 <input type="color" id="carpet-color-accent" />
               </label>
             </div>
+          </section>
+
+          <section class="panel-section hidden" id="tv-options">
+            <h3 id="tv-options-title">Televize</h3>
+            <p class="save-hint" id="tv-options-hint">Způsob umístění</p>
+            <div class="carpet-option-row" id="tv-style-btns"></div>
           </section>
 
           <section class="panel-section architect-only catalog-section">
@@ -242,7 +249,10 @@ export class BytPlannerApp {
     this.carpetOptionsHint = this.root.querySelector('#carpet-options-hint');
     this.carpetColorMain = this.root.querySelector('#carpet-color-main');
     this.carpetColorAccent = this.root.querySelector('#carpet-color-accent');
+    this.tvOptionsPanel = this.root.querySelector('#tv-options');
+    this.tvOptionsHint = this.root.querySelector('#tv-options-hint');
     this.renderCarpetShapeButtons();
+    this.renderTvStyleButtons();
     this.applyLeftPanelCollapsed(this.leftPanelCollapsed);
 
     const aptBtns = this.root.querySelector('#apartment-btns');
@@ -790,6 +800,7 @@ export class BytPlannerApp {
     this.updateSaveHintDefault();
     this.updateDoorOptionsPanel();
     this.updateCarpetOptionsPanel();
+    this.updateTvOptionsPanel();
     this.updateWallSelectionUI();
   }
 
@@ -972,7 +983,9 @@ export class BytPlannerApp {
     if (isCarpetType(type)) {
       this.scene.clearPlacementGhost();
     } else {
-      this.scene.setPlacementGhost(type);
+      this.scene.setPlacementGhost(type, {
+        tvStyle: isTvType(type) ? this.tvStyleDefaults.tv : undefined,
+      });
     }
 
     this.root.querySelectorAll('.furniture-item').forEach((item) => {
@@ -982,6 +995,7 @@ export class BytPlannerApp {
       btn.classList.toggle('active', btn.dataset.tool === 'select');
     });
     this.updateCarpetOptionsPanel();
+    this.updateTvOptionsPanel();
     this.updateStatus();
   }
 
@@ -1000,6 +1014,7 @@ export class BytPlannerApp {
     this.scene.controls.enabled = true;
     this.canvasContainer?.classList.remove('placing-drag');
     this.updateCarpetOptionsPanel();
+    this.updateTvOptionsPanel();
   }
 
   getOpeningState(furniture) {
@@ -1012,7 +1027,8 @@ export class BytPlannerApp {
   }
 
   snapWallOpeningToWall(furniture) {
-    if (!isWallGapType(furniture.userData.furnitureType)) return false;
+    const { furnitureType, tvStyle } = furniture.userData;
+    if (!usesWallSnap(furnitureType, tvStyle)) return false;
 
     const opening = this.getOpeningState(furniture);
     const wall = findNearestWallAt(opening.x, opening.z, this.walls);
@@ -1027,7 +1043,8 @@ export class BytPlannerApp {
 
   snapPlacementGhostToWall() {
     const ghost = this.scene.placementGhost;
-    if (!ghost || !this.placingType || !isWallGapType(this.placingType)) return;
+    if (!ghost || !this.placingType) return;
+    if (!usesWallSnap(this.placingType, this.tvStyleDefaults.tv)) return;
 
     const x = ghost.position.x / GRID_SIZE;
     const z = ghost.position.z / GRID_SIZE;
@@ -1080,9 +1097,12 @@ export class BytPlannerApp {
 
     const { x, z } = this.placingGridPos;
     const type = this.placingType;
-    const furn = this.scene.addFurniture(type, x, z);
+    const furn = this.scene.addFurniture(type, x, z, 0, {
+      tvStyle: isTvType(type) ? this.tvStyleDefaults.tv : undefined,
+    });
     if (furn) {
-      if (this.snapWallOpeningToWall(furn)) {
+      this.snapWallOpeningToWall(furn);
+      if (isWallGapType(type)) {
         this.scene.refreshWallOpenings();
       }
       this.selectFurniture(furn);
@@ -1103,7 +1123,7 @@ export class BytPlannerApp {
     const hit = this.scene.raycast(e.clientX, e.clientY);
 
     if (this.mode === 'preview') {
-      if (hit?.type === 'furniture' && isOpenableType(hit.object.userData.furnitureType)) {
+      if (hit?.type === 'furniture' && (isOpenableType(hit.object.userData.furnitureType) || isTvType(hit.object.userData.furnitureType))) {
         this.selectFurniture(hit.object);
         return;
       }
@@ -1212,7 +1232,10 @@ export class BytPlannerApp {
           yOff,
           snapped.z * GRID_SIZE
         );
-        if (isWallGapType(this.cursorFollowFurniture.userData.furnitureType)) {
+        if (usesWallSnap(
+          this.cursorFollowFurniture.userData.furnitureType,
+          this.cursorFollowFurniture.userData.tvStyle
+        )) {
           this.snapWallOpeningToWall(this.cursorFollowFurniture);
         }
       }
@@ -1234,9 +1257,11 @@ export class BytPlannerApp {
       yOff,
       snapped.z * GRID_SIZE
     );
-    if (isWallGapType(this.selectedFurniture.userData.furnitureType)) {
+    if (usesWallSnap(this.selectedFurniture.userData.furnitureType, this.selectedFurniture.userData.tvStyle)) {
       this.snapWallOpeningToWall(this.selectedFurniture);
-      this.scene.refreshWallOpenings();
+      if (isWallGapType(this.selectedFurniture.userData.furnitureType)) {
+        this.scene.refreshWallOpenings();
+      }
     }
   }
 
@@ -1272,9 +1297,12 @@ export class BytPlannerApp {
     this.isDragging = false;
 
     if (wasDragging && this.selectedFurniture) {
-      if (isWallGapType(this.selectedFurniture.userData.furnitureType)) {
+      const { furnitureType, tvStyle } = this.selectedFurniture.userData;
+      if (usesWallSnap(furnitureType, tvStyle)) {
         this.snapWallOpeningToWall(this.selectedFurniture);
-        this.scene.refreshWallOpenings();
+        if (isWallGapType(furnitureType)) {
+          this.scene.refreshWallOpenings();
+        }
       }
       this.scheduleSave();
     }
@@ -1294,9 +1322,12 @@ export class BytPlannerApp {
       z = plot.depth / 2;
     }
 
-    const furn = this.scene.addFurniture(this.placingType, x, z);
+    const furn = this.scene.addFurniture(this.placingType, x, z, 0, {
+      tvStyle: isTvType(this.placingType) ? this.tvStyleDefaults.tv : undefined,
+    });
     if (furn) {
-      if (this.snapWallOpeningToWall(furn)) {
+      this.snapWallOpeningToWall(furn);
+      if (isWallGapType(type)) {
         this.scene.refreshWallOpenings();
       }
       this.selectFurniture(furn);
@@ -1383,7 +1414,74 @@ export class BytPlannerApp {
 
     this.updateDoorOptionsPanel();
     this.updateCarpetOptionsPanel();
+    this.updateTvOptionsPanel();
     this.updatePreviewOpenablePopover();
+  }
+
+  renderTvStyleButtons() {
+    const row = this.root.querySelector('#tv-style-btns');
+    if (!row) return;
+    row.innerHTML = '';
+    for (const [id, meta] of Object.entries(TV_STYLES)) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'carpet-opt-btn';
+      btn.dataset.tvStyle = id;
+      btn.title = meta.label;
+      btn.textContent = `${meta.icon} ${meta.label}`;
+      btn.addEventListener('click', () => this.applyTvStyle(id));
+      row.appendChild(btn);
+    }
+  }
+
+  getActiveTvStyle() {
+    if (this.selectedFurniture && isTvType(this.selectedFurniture.userData.furnitureType)) {
+      return this.selectedFurniture.userData.tvStyle ?? 'wall';
+    }
+    if (this.placingType && isTvType(this.placingType)) {
+      return this.tvStyleDefaults.tv ?? 'wall';
+    }
+    return null;
+  }
+
+  updateTvOptionsPanel() {
+    const show = (this.mode === 'architect' || this.mode === 'preview')
+      && (this.selectedFurniture && isTvType(this.selectedFurniture.userData.furnitureType)
+        || this.placingType && isTvType(this.placingType));
+    this.tvOptionsPanel?.classList.toggle('hidden', !show);
+    if (!show) return;
+
+    const style = this.getActiveTvStyle();
+    this.tvOptionsHint.textContent = this.selectedFurniture
+      ? 'Upravíš vybranou televizi'
+      : 'Nastavíš styl před položením';
+
+    this.root.querySelectorAll('[data-tv-style]').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.tvStyle === style);
+    });
+  }
+
+  applyTvStyle(style) {
+    if (!TV_STYLES[style]) return;
+
+    if (this.selectedFurniture && isTvType(this.selectedFurniture.userData.furnitureType)) {
+      this.selectedFurniture.userData.tvStyle = style;
+      rebuildTvGroup(this.selectedFurniture, this.mode);
+      if (this.mode === 'architect') {
+        this.scheduleSave();
+      } else {
+        this.persistCurrentApartment();
+        writeSave(this.savedData);
+      }
+    } else if (this.placingType && isTvType(this.placingType)) {
+      this.tvStyleDefaults.tv = style;
+      if (this.scene.placementGhost) {
+        this.scene.placementGhost.userData.tvStyle = style;
+        rebuildTvGroup(this.scene.placementGhost, 'architect');
+      }
+    }
+
+    this.updateTvOptionsPanel();
   }
 
   getActiveCarpetType() {
@@ -1659,6 +1757,7 @@ export class BytPlannerApp {
     this.selectedFurniture = null;
     this.updateDoorOptionsPanel();
     this.updateCarpetOptionsPanel();
+    this.updateTvOptionsPanel();
   }
 
   clearSelection() {
@@ -1709,6 +1808,7 @@ export class BytPlannerApp {
     if (wasWallGap) this.scene.refreshWallOpenings();
     this.updateDoorOptionsPanel();
     this.updateCarpetOptionsPanel();
+    this.updateTvOptionsPanel();
   }
 
   copySelected() {
@@ -1726,6 +1826,9 @@ export class BytPlannerApp {
       this.furnitureClipboard.carpetPattern = this.selectedFurniture.userData.carpetPattern;
       this.furnitureClipboard.carpetColor = this.selectedFurniture.userData.carpetColor;
       this.furnitureClipboard.carpetAccent = this.selectedFurniture.userData.carpetAccent;
+    }
+    if (isTvType(this.furnitureClipboard.type)) {
+      this.furnitureClipboard.tvStyle = this.selectedFurniture.userData.tvStyle ?? 'wall';
     }
     this.flashCopyHint('Zkopírováno ✓');
   }
@@ -1760,6 +1863,7 @@ export class BytPlannerApp {
         carpetPattern: this.furnitureClipboard.carpetPattern,
         carpetColor: this.furnitureClipboard.carpetColor,
         carpetAccent: this.furnitureClipboard.carpetAccent,
+        tvStyle: this.furnitureClipboard.tvStyle,
       }
     );
     if (!furn) return;
@@ -1813,7 +1917,8 @@ export class BytPlannerApp {
     const opening = this.getOpeningState(this.selectedFurniture);
     const onWall = isOpeningOnWall(opening, this.walls, FURNITURE_CATALOG, GRID_SIZE);
 
-    if (isWallGapType(this.selectedFurniture.userData.furnitureType) && onWall) {
+    const ud = this.selectedFurniture.userData;
+    if (usesWallSnap(ud.furnitureType, ud.tvStyle) && onWall) {
       const wall = findNearestWallAt(opening.x, opening.z, this.walls);
       if (wall) {
         const aligned = snapOpeningRotationToWall(this.selectedFurniture.rotation.y, getWallYaw(wall));
@@ -1823,7 +1928,7 @@ export class BytPlannerApp {
       this.selectedFurniture.rotation.y += step * FURNITURE_ROTATION_STEP;
     }
 
-    if (isWallGapType(this.selectedFurniture.userData.furnitureType)) {
+    if (isWallGapType(ud.furnitureType)) {
       this.scene.refreshWallOpenings();
     }
     if (this.mode === 'architect') {

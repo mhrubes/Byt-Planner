@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { WALL_THICKNESS } from './apartments.js';
 
 /** Definice všech položek — rozměry v metrech */
 const FURNITURE_ITEMS = {
@@ -54,9 +55,13 @@ const FURNITURE_ITEMS = {
   tv: {
     label: 'Televize',
     icon: '📺',
-    size: { w: 1.2, h: 0.7, d: 0.08 },
+    size: { w: 1.8, h: 1.05, d: 0.08 },
     color: '#1a1a2e',
     accent: '#2d2d44',
+    screen: '#101018',
+    stand: '#3a3028',
+    standTop: '#4a4038',
+    sillHeight: 0.5,
   },
   fireplace: {
     label: 'Krb',
@@ -461,6 +466,27 @@ export const CABINET_TYPES = new Set([...SHELF_CABINET_TYPES, 'wardrobe']);
 
 export const CARPET_TYPES = new Set(['carpet', 'bath_carpet']);
 
+export const TV_STYLES = {
+  wall: { label: 'Vyvěšená', icon: '📺' },
+  wall_inset: { label: 'Na zdi', icon: '🧱' },
+  stand: { label: 'Na polici', icon: '🎮' },
+};
+
+export const TV_STYLE_DEFAULTS = { tv: 'wall' };
+
+export function isTvType(type) {
+  return type === 'tv';
+}
+
+export function isTvWallInsetStyle(tvStyle) {
+  return tvStyle === 'wall_inset';
+}
+
+/** Zarovnání na zeď + výřez ve zdi (dveře, okna, TV zapuštěná ve zdi) */
+export function usesWallSnap(type, tvStyle) {
+  return isWallGapType(type) || (isTvType(type) && isTvWallInsetStyle(tvStyle));
+}
+
 export const CARPET_SHAPES = {
   rect: { label: 'Obdélník', icon: '▭' },
   round: { label: 'Kulatý', icon: '●' },
@@ -533,6 +559,7 @@ export function createFurnitureMesh(type, mode = 'preview', {
   carpetPattern,
   carpetColor,
   carpetAccent,
+  tvStyle,
 } = {}) {
   const def = FURNITURE_ITEMS[type];
   if (!def) return null;
@@ -562,6 +589,10 @@ export function createFurnitureMesh(type, mode = 'preview', {
     group.userData.carpetAccent = carpetAccent ?? styleDefaults.accent ?? def.accent;
   }
 
+  if (isTvType(type)) {
+    group.userData.tvStyle = tvStyle ?? TV_STYLE_DEFAULTS.tv ?? 'wall';
+  }
+
   switch (type) {
     case 'door':
       buildDoor(group, w, h, d, def, isArchitect);
@@ -589,8 +620,7 @@ export function createFurnitureMesh(type, mode = 'preview', {
       addLegs(group, w, d, h * 0.45, def.accent, isArchitect);
       break;
     case 'tv':
-      addBox(group, w, h, d, 0, h * 0.5 + 0.5, 0, def.color, isArchitect);
-      addBox(group, w * 0.6, 0.05, d * 2, 0, 0.5, 0, '#333333', isArchitect);
+      buildTv(group, w, h, d, def, isArchitect, group.userData.tvStyle);
       break;
     case 'fireplace':
       buildFireplace(group, w, h, d, def, isArchitect);
@@ -1057,6 +1087,102 @@ function buildDesk(group, w, h, d, def, architect) {
 function addPillow(group, x, y, z, pw, ph, pd, architect) {
   addBox(group, pw, ph, pd, x, y, z, '#ffffff', architect);
   addBox(group, pw * 0.88, ph * 0.18, pd * 0.82, x, y + ph * 0.22, z + pd * 0.04, '#f0f0f0', architect);
+}
+
+function buildTvWallInset(group, w, h, d, def, architect) {
+  const screen = def.screen ?? '#101018';
+  const bezel = def.color ?? '#1a1a2e';
+  const mountY = h * 0.5 + 0.5;
+  const depth = Math.max(d * 1.15, 0.07);
+  const centerZ = WALL_THICKNESS / 2 + depth / 2;
+
+  addBox(group, w, h, depth, 0, mountY, centerZ, bezel, architect, { keepColor: true });
+  addBox(group, w * 0.9, h * 0.84, depth * 0.38, 0, mountY, centerZ + depth * 0.22, screen, architect, {
+    emissive: '#1a2840',
+    keepColor: true,
+  });
+  addBox(group, w * 0.12, 0.02, depth * 0.55, 0, mountY - h * 0.42, centerZ + depth * 0.16, '#111118', architect);
+}
+
+function buildTvWall(group, w, h, d, def, architect) {
+  const screen = def.screen ?? '#101018';
+  const bezel = def.color ?? '#1a1a2e';
+  const mountY = h * 0.5 + 0.5;
+
+  addBox(group, w * 0.62, 0.05, d * 1.8, 0, 0.5, 0, '#2a2a32', architect);
+  addBox(group, w * 0.08, 0.22, d * 0.9, 0, 0.62, 0, '#3a3a44', architect);
+  addBox(group, w, h, d * 1.1, 0, mountY, 0, bezel, architect);
+  addBox(group, w * 0.9, h * 0.82, d * 0.35, 0, mountY, d * 0.22, screen, architect, {
+    emissive: '#1a2840',
+    keepColor: true,
+  });
+  addBox(group, w * 0.14, 0.02, d * 0.5, -w * 0.34, mountY - h * 0.38, d * 0.3, '#111118', architect);
+}
+
+function buildTvStand(group, w, h, d, def, architect) {
+  const screen = def.screen ?? '#101018';
+  const bezel = def.color ?? '#1a1a2e';
+  const cabinet = def.stand ?? '#3a3028';
+  const cabinetTop = def.standTop ?? '#4a4038';
+  const legH = h * 0.1;
+  const cabinetH = h * 0.46;
+  const pedestalH = h * 0.07;
+  const cabinetD = Math.max(d * 4.2, 0.34);
+  const cabinetY = legH + cabinetH * 0.5;
+  const screenH = h * 1.12;
+  const screenY = legH + cabinetH + pedestalH + screenH * 0.5;
+  const screenD = d * 1.1;
+
+  for (const [lx, lz] of [
+    [-w * 0.44, -cabinetD * 0.38],
+    [w * 0.44, -cabinetD * 0.38],
+    [-w * 0.44, cabinetD * 0.38],
+    [w * 0.44, cabinetD * 0.38],
+  ]) {
+    addBox(group, 0.05, legH, 0.05, lx, legH * 0.5, lz + cabinetD * 0.08, '#2a2218', architect);
+  }
+
+  addBox(group, w * 1.08, cabinetH, cabinetD, 0, cabinetY, cabinetD * 0.08, cabinet, architect);
+  addBox(group, w * 1.1, 0.018, cabinetD * 1.02, 0, legH + cabinetH + 0.009, cabinetD * 0.08, cabinetTop, architect);
+  addBox(group, 0.02, cabinetH * 0.88, cabinetD * 0.9, -w * 0.36, cabinetY, cabinetD * 0.08, '#2a2218', architect);
+  addBox(group, 0.02, cabinetH * 0.88, cabinetD * 0.9, w * 0.18, cabinetY, cabinetD * 0.08, '#2a2218', architect);
+
+  addBox(group, w * 0.22, cabinetH * 0.72, cabinetD * 0.82, -w * 0.38, cabinetY, cabinetD * 0.08, '#2e2620', architect);
+  addBox(group, w * 0.18, 0.11, 0.02, -w * 0.38, cabinetY + cabinetH * 0.18, cabinetD * 0.42, '#2a4a7a', architect, { keepColor: true });
+  addBox(group, w * 0.16, 0.1, 0.02, -w * 0.38, cabinetY + cabinetH * 0.02, cabinetD * 0.42, '#7a2a2a', architect, { keepColor: true });
+  addBox(group, w * 0.14, 0.09, 0.02, -w * 0.38, cabinetY - cabinetH * 0.14, cabinetD * 0.42, '#2a6a3a', architect, { keepColor: true });
+
+  addBox(group, w * 0.34, 0.07, cabinetD * 0.55, w * 0.08, cabinetY - cabinetH * 0.08, cabinetD * 0.12, '#141414', architect);
+  addBox(group, w * 0.28, 0.04, cabinetD * 0.48, w * 0.08, cabinetY - cabinetH * 0.02, cabinetD * 0.1, '#1e1e24', architect);
+  addCylinder(group, 0.018, 0.006, '#2a2a30', architect, {
+    x: w * 0.18,
+    y: cabinetY - cabinetH * 0.02,
+    z: cabinetD * 0.34,
+  });
+
+  addBox(group, w * 0.12, cabinetH * 0.42, cabinetD * 0.7, w * 0.4, cabinetY, cabinetD * 0.1, '#222228', architect);
+  addBox(group, w * 0.05, 0.03, 0.04, w * 0.34, cabinetY - cabinetH * 0.05, cabinetD * 0.38, '#3a3a44', architect);
+
+  const pedestalY = legH + cabinetH + pedestalH * 0.5;
+  addBox(group, w * 0.22, pedestalH, screenD * 0.55, 0, pedestalY, cabinetD * 0.06, '#1a1a22', architect);
+  addBox(group, w * 0.34, 0.012, screenD * 0.7, 0, legH + cabinetH + pedestalH - 0.006, cabinetD * 0.06, '#2a2a32', architect);
+
+  addBox(group, w * 0.96, screenH, screenD, 0, screenY, cabinetD * 0.06, bezel, architect);
+  addBox(group, w * 0.86, screenH * 0.84, screenD * 0.35, 0, screenY, cabinetD * 0.06 + screenD * 0.2, screen, architect, {
+    emissive: '#1a2840',
+    keepColor: true,
+  });
+  addBox(group, w * 0.1, 0.015, screenD * 0.5, 0, screenY - screenH * 0.46, cabinetD * 0.06 + screenD * 0.15, '#111118', architect);
+}
+
+function buildTv(group, w, h, d, def, architect, style = 'wall') {
+  if (style === 'stand') {
+    buildTvStand(group, w, h, d, def, architect);
+  } else if (style === 'wall_inset') {
+    buildTvWallInset(group, w, h, d, def, architect);
+  } else {
+    buildTvWall(group, w, h, d, def, architect);
+  }
 }
 
 function buildSofa(group, w, h, d, def, architect) {
@@ -2504,6 +2630,33 @@ export function rebuildCarpetGroup(group, mode) {
     color: group.userData.carpetColor,
     accent: group.userData.carpetAccent,
   });
+
+  if (ring) {
+    group.add(ring);
+  }
+}
+
+export function rebuildTvGroup(group, mode) {
+  if (!isTvType(group.userData.furnitureType)) return;
+
+  const ring = group.userData.selectionRing;
+  if (ring) group.remove(ring);
+
+  const children = [...group.children];
+  for (const child of children) {
+    child.traverse((c) => {
+      if (c.geometry) c.geometry.dispose();
+      if (c.material) c.material.dispose();
+    });
+    group.remove(child);
+  }
+
+  const def = FURNITURE_ITEMS.tv;
+  const w = def.size.w;
+  const h = def.size.h;
+  const d = def.size.d;
+
+  buildTv(group, w, h, d, def, mode === 'architect', group.userData.tvStyle ?? 'wall');
 
   if (ring) {
     group.add(ring);

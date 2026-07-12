@@ -7,6 +7,7 @@ import {
   FURNITURE_CATALOG,
   isDoorType,
   isWallGapType,
+  isTvType,
   isOpenableType,
   isCarpetType,
   applyDoorOpenState,
@@ -572,6 +573,7 @@ export class SceneManager {
     carpetPattern,
     carpetColor,
     carpetAccent,
+    tvStyle,
   } = {}) {
     const mesh = createFurnitureMesh(type, this.mode, {
       sizeW,
@@ -580,6 +582,7 @@ export class SceneManager {
       carpetPattern,
       carpetColor,
       carpetAccent,
+      tvStyle,
     });
     if (!mesh) return null;
     const yOff = getFurnitureMountOffset(type);
@@ -616,6 +619,9 @@ export class SceneManager {
         item.carpetColor = f.userData.carpetColor;
         item.carpetAccent = f.userData.carpetAccent;
       }
+      if (isTvType(item.type)) {
+        item.tvStyle = f.userData.tvStyle ?? 'wall';
+      }
       return item;
     });
   }
@@ -632,6 +638,7 @@ export class SceneManager {
         carpetPattern: item.carpetPattern,
         carpetColor: item.carpetColor,
         carpetAccent: item.carpetAccent,
+        tvStyle: item.tvStyle,
       });
     }
     this.refreshWallOpenings();
@@ -726,11 +733,11 @@ export class SceneManager {
     return this.snapToGrid(worldX, worldZ, { subdivisions: FURNITURE_GRID_SUBDIVISIONS });
   }
 
-  setPlacementGhost(type) {
+  setPlacementGhost(type, { tvStyle } = {}) {
     this.clearPlacementGhost();
     if (!type) return;
 
-    const ghost = createFurnitureMesh(type, 'architect');
+    const ghost = createFurnitureMesh(type, 'architect', { tvStyle });
     if (!ghost) return;
 
     const isStructural = FURNITURE_CATALOG[type]?.structural;
