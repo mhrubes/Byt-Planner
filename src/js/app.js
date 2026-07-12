@@ -26,7 +26,10 @@ import {
   clearFurnitureGroup,
   dissolvePartialGroups,
   getGroupMembers,
+  getLayoutWrapper,
   nextGroupId,
+  removeOrphanLayoutWrappers,
+  pickGroupAnchor,
   rotateGroupLayout,
   snapFurnitureRow,
   updateGroupOffsets,
@@ -46,6 +49,7 @@ export class BytPlannerApp {
     this.selectedFurniture = null;
     this.selectedFurnitureItems = new Set();
     this.dragGroupMembers = null;
+    this.dragGroupWrapper = null;
     this.dragStartPositions = null;
     this.dragAnchorStart = null;
     this.isDragging = false;
@@ -1335,6 +1339,11 @@ export class BytPlannerApp {
     const newX = snapped.x * GRID_SIZE;
     const newZ = snapped.z * GRID_SIZE;
 
+    if (this.dragGroupWrapper && this.dragAnchorStart) {
+      this.dragGroupWrapper.position.set(newX, this.dragGroupWrapper.position.y, newZ);
+      return;
+    }
+
     if (this.dragGroupMembers?.length && this.dragAnchorStart && this.dragStartPositions) {
       const dx = newX - this.dragAnchorStart.x;
       const dz = newZ - this.dragAnchorStart.z;
@@ -1400,6 +1409,7 @@ export class BytPlannerApp {
     }
 
     this.dragGroupMembers = null;
+    this.dragGroupWrapper = null;
     this.dragStartPositions = null;
     this.dragAnchorStart = null;
     this.scene.controls.enabled = true;
@@ -1484,9 +1494,14 @@ export class BytPlannerApp {
     const groupId = obj.userData.furnitureGroupId;
     if (groupId) {
       const members = getGroupMembers(this.scene.furnitureGroup, groupId);
+      const wrapper = getLayoutWrapper(this.scene.furnitureGroup, groupId);
       this.selectedFurnitureItems = new Set(members);
-      for (const member of members) {
-        this.highlightFurniture(member);
+      if (wrapper) {
+        this.highlightLayoutGroup(groupId, members);
+      } else {
+        for (const member of members) {
+          this.highlightFurniture(member);
+        }
       }
     } else {
       this.selectedFurnitureItems.add(obj);
@@ -1499,6 +1514,46 @@ export class BytPlannerApp {
     this.updateGroupOptionsPanel();
     this.updatePreviewOpenablePopover();
     this.updateStatus();
+  }
+
+  highlightLayoutGroup(groupId, members) {
+    if (this.mode !== 'architect') return;
+
+    const wrapper = getLayoutWrapper(this.scene.furnitureGroup, groupId);
+    if (!wrapper) {
+      for (const member of members) this.highlightFurniture(member);
+      return;
+    }
+
+    for (const member of members) {
+      if (member.userData.selectionRing) member.userData.selectionRing.visible = false;
+    }
+
+    if (!wrapper.userData.selectionRing) {
+      const ringGeo = new THREE.RingGeometry(0.55, 0.65, 32);
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: 0x5b8def,
+        transparent: true,
+        opacity: 0.85,
+        side: THREE.DoubleSide,
+      });
+      const ring = new THREE.Mesh(ringGeo, ringMat);
+      ring.rotation.x = -Math.PI / 2;
+      ring.userData.isSelectionRing = true;
+      wrapper.add(ring);
+      wrapper.userData.selectionRing = ring;
+    }
+
+    let maxSpan = 1.2;
+    for (const member of members) {
+      const type = member.userData.furnitureType;
+      const def = FURNITURE_CATALOG[type];
+      if (def) maxSpan = Math.max(maxSpan, def.size?.w ?? 1, def.size?.d ?? 1);
+    }
+    const scale = Math.max(1.4, maxSpan / 1.1);
+    wrapper.userData.selectionRing.position.y = 0.03;
+    wrapper.userData.selectionRing.scale.set(scale, scale, 1);
+    wrapper.userData.selectionRing.visible = true;
   }
 
   toggleFurnitureSelection(obj) {
@@ -1566,15 +1621,29 @@ export class BytPlannerApp {
     const primary = this.selectedFurniture;
     if (!primary) {
       this.dragGroupMembers = null;
+    this.dragGroupWrapper = null;
+      this.dragGroupWrapper = null;
       this.dragStartPositions = null;
       this.dragAnchorStart = null;
       return;
     }
 
     const groupId = primary.userData.furnitureGroupId;
+    this.dragGroupWrapper = groupId
+      ? getLayoutWrapper(this.scene.furnitureGroup, groupId)
+      : null;
     this.dragGroupMembers = groupId
       ? getGroupMembers(this.scene.furnitureGroup, groupId)
       : [primary];
+
+    if (this.dragGroupWrapper) {
+      this.dragAnchorStart = {
+        x: this.dragGroupWrapper.position.x,
+        z: this.dragGroupWrapper.position.z,
+      };
+      this.dragStartPositions = null;
+      return;
+    }
 
     this.dragStartPositions = this.dragGroupMembers.map((obj) => ({
       x: obj.position.x,
@@ -1594,9 +1663,11 @@ export class BytPlannerApp {
   syncGroupOffsetsForMembers(members) {
     const groupId = members[0]?.userData.furnitureGroupId;
     if (!groupId) return;
-    const anchorId = members[0].userData.groupAnchorId;
-    const anchor = members.find((obj) => obj.userData.furnitureId === anchorId) ?? members[0];
-    updateGroupOffsets(members, anchor);
+    const mode = members[0].userData.groupMode ?? 'layout';
+    const anchor = members.find((obj) => obj.userData.furnitureId === members[0].userData.groupAnchorId)
+      ?? pickGroupAnchor(members);
+    updateGroupOffsets(members, anchor ?? members[0]);
+    if (mode === 'layout') return;
   }
 
   groupSelectedFurniture() {
@@ -1620,15 +1691,23 @@ export class BytPlannerApp {
     dissolvePartialGroups(this.scene.furnitureGroup, items);
 
     const groupId = nextGroupId();
-    const anchor = mode === 'row'
-      ? assignFurnitureGroupRow(items, groupId)
-      : assignFurnitureGroupLayout(items, groupId);
-
-    for (const obj of items) {
-      this.highlightFurniture(obj);
+    if (mode === 'row') {
+      assignFurnitureGroupRow(items, groupId);
+      for (const obj of items) {
+        this.highlightFurniture(obj);
+      }
+      this.selectedFurniture = items[0];
+    } else {
+      assignFurnitureGroupLayout(items, groupId, this.scene.furnitureGroup);
+      const members = getGroupMembers(this.scene.furnitureGroup, groupId);
+      this.highlightLayoutGroup(groupId, members);
+      this.selectedFurniture = members[0];
+      this.selectedFurnitureItems = new Set(members);
     }
-    this.selectedFurniture = anchor;
-    this.selectedFurnitureItems = new Set(items);
+
+    if (mode === 'row') {
+      this.selectedFurnitureItems = new Set(items);
+    }
 
     this.updateGroupOptionsPanel();
     this.updateStatus();
@@ -1647,7 +1726,9 @@ export class BytPlannerApp {
     }
 
     const members = getGroupMembers(this.scene.furnitureGroup, groupId);
-    clearFurnitureGroup(members);
+    clearFurnitureGroup(members, this.scene.furnitureGroup);
+    removeOrphanLayoutWrappers(this.scene.furnitureGroup);
+    this.clearSelectionHighlight();
     this.updateGroupOptionsPanel();
     this.updateStatus();
     this.scheduleSave();
@@ -2039,6 +2120,12 @@ export class BytPlannerApp {
     for (const obj of this.selectedFurnitureItems) {
       if (obj.userData.selectionRing) obj.userData.selectionRing.visible = false;
     }
+    for (const child of this.scene.furnitureGroup.children) {
+      if (child.userData.isFurnitureLayoutWrapper) {
+        if (child.userData.selectionRing) child.userData.selectionRing.visible = false;
+      }
+    }
+    removeOrphanLayoutWrappers(this.scene.furnitureGroup);
     this.selectedFurnitureItems.clear();
     this.selectedFurniture = null;
     this.updateDoorOptionsPanel();
@@ -2092,7 +2179,7 @@ export class BytPlannerApp {
       if (c.geometry) c.geometry.dispose();
       if (c.material) c.material.dispose();
     });
-    this.scene.furnitureGroup.remove(obj);
+    if (obj.parent) obj.parent.remove(obj);
     if (this.cursorFollowFurniture === obj) this.cursorFollowFurniture = null;
     if (this.selectedFurniture === obj) this.selectedFurniture = null;
     this.selectedFurnitureItems.delete(obj);
@@ -2100,10 +2187,11 @@ export class BytPlannerApp {
     if (groupId) {
       const remaining = getGroupMembers(this.scene.furnitureGroup, groupId);
       if (remaining.length < 2) {
-        clearFurnitureGroup(remaining);
+        clearFurnitureGroup(remaining, this.scene.furnitureGroup);
       } else {
         this.syncGroupOffsetsForMembers(remaining);
       }
+      removeOrphanLayoutWrappers(this.scene.furnitureGroup);
     }
 
     if (wasWallGap) this.scene.refreshWallOpenings();
@@ -2218,19 +2306,21 @@ export class BytPlannerApp {
 
   rotateSelectedStep(step = 1) {
     if (!this.selectedFurniture) return;
-    if (!this.selectedFurniture.userData.rotatable) return;
 
     const groupId = this.selectedFurniture.userData.furnitureGroupId;
+    const multiSelection = this.selectedFurnitureItems.size > 1
+      ? [...this.selectedFurnitureItems]
+      : null;
     const targets = groupId
       ? getGroupMembers(this.scene.furnitureGroup, groupId)
-      : [this.selectedFurniture];
-    const groupMode = this.selectedFurniture.userData.groupMode ?? 'layout';
+      : (multiSelection ?? [this.selectedFurniture]);
+    const groupMode = groupId
+      ? (this.selectedFurniture.userData.groupMode ?? 'layout')
+      : 'layout';
     const delta = step * FURNITURE_ROTATION_STEP;
 
-    if (groupId && targets.length > 1 && groupMode === 'layout') {
-      const anchorId = targets[0].userData.groupAnchorId;
-      const anchor = targets.find((obj) => obj.userData.furnitureId === anchorId) ?? targets[0];
-      rotateGroupLayout(targets, anchor, delta);
+    if (targets.length > 1 && groupMode === 'layout') {
+      rotateGroupLayout(targets, delta, this.scene.furnitureGroup);
 
       if (this.mode === 'architect') {
         this.scheduleSave();
@@ -2240,6 +2330,8 @@ export class BytPlannerApp {
       }
       return;
     }
+
+    if (!this.selectedFurniture.userData.rotatable) return;
 
     for (const furniture of targets) {
       if (!furniture.userData.rotatable) continue;

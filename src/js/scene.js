@@ -15,7 +15,7 @@ import {
   getFurnitureMountOffset,
   syncFurnitureIdCounter,
 } from './furniture.js';
-import { syncGroupIdCounterFromState } from './furniture-groups.js';
+import { syncGroupIdCounterFromState, rebuildLayoutGroups, collectFurnitureStateItems, removeOrphanLayoutWrappers } from './furniture-groups.js';
 
 export class SceneManager {
   constructor(container) {
@@ -111,7 +111,13 @@ export class SceneManager {
 
     this.rebuildWalls();
     this.rebuildFloor();
-    this.furnitureGroup.children.forEach((f) => updateFurnitureMaterials(f, mode));
+    this.furnitureGroup.children.forEach((f) => {
+      if (f.userData.isFurnitureLayoutWrapper) {
+        f.children.forEach((member) => updateFurnitureMaterials(member, mode));
+      } else {
+        updateFurnitureMaterials(f, mode);
+      }
+    });
   }
 
   setPlotSize(plotSize, apartmentBounds = null) {
@@ -618,13 +624,13 @@ export class SceneManager {
   }
 
   getFurnitureState() {
-    return this.furnitureGroup.children.map((f) => {
+    return collectFurnitureStateItems(this.furnitureGroup).map(({ obj: f, x, z, rotation }) => {
       const item = {
         type: f.userData.furnitureType,
         furnitureId: f.userData.furnitureId,
-        x: f.position.x / GRID_SIZE,
-        z: f.position.z / GRID_SIZE,
-        rotation: f.rotation.y,
+        x: x / GRID_SIZE,
+        z: z / GRID_SIZE,
+        rotation,
       };
       if (f.userData.furnitureGroupId) {
         item.furnitureGroupId = f.userData.furnitureGroupId;
@@ -676,11 +682,19 @@ export class SceneManager {
       });
     }
     this.refreshWallOpenings();
+    rebuildLayoutGroups(this.furnitureGroup);
+    removeOrphanLayoutWrappers(this.furnitureGroup);
   }
 
   getIntersectables() {
     const list = [];
-    this.furnitureGroup.children.forEach((f) => list.push(f));
+    this.furnitureGroup.children.forEach((f) => {
+      if (f.userData.isFurnitureLayoutWrapper) {
+        f.children.forEach((member) => list.push(member));
+      } else {
+        list.push(f);
+      }
+    });
     if (this.mode === 'architect' || this.mode === 'preview') {
       this.wallsGroup.children.forEach((w) => list.push(w));
     }
@@ -715,14 +729,18 @@ export class SceneManager {
       while (obj) {
         if (obj.userData?.isFurniture) {
           let furniture = obj;
-          while (furniture.parent && furniture.parent !== this.furnitureGroup) {
+          while (furniture.parent
+            && furniture.parent !== this.furnitureGroup
+            && !furniture.parent.userData?.isFurnitureLayoutWrapper) {
             furniture = furniture.parent;
           }
           return { type: 'furniture', object: furniture, point: hit.point };
         }
         if (obj.parent?.userData?.isFurniture) {
           let furniture = obj.parent;
-          while (furniture.parent && furniture.parent !== this.furnitureGroup) {
+          while (furniture.parent
+            && furniture.parent !== this.furnitureGroup
+            && !furniture.parent.userData?.isFurnitureLayoutWrapper) {
             furniture = furniture.parent;
           }
           return { type: 'furniture', object: furniture, point: hit.point };
@@ -742,7 +760,9 @@ export class SceneManager {
 
     if (obj.userData.isFurniture || obj.parent?.userData?.isFurniture) {
       let furniture = obj.userData.isFurniture ? obj : obj.parent;
-      while (furniture.parent && furniture.parent !== this.furnitureGroup) {
+      while (furniture.parent
+        && furniture.parent !== this.furnitureGroup
+        && !furniture.parent.userData?.isFurnitureLayoutWrapper) {
         furniture = furniture.parent;
       }
       return { type: 'furniture', object: furniture, point: hits[0].point };
