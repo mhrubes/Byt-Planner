@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { GRID_SIZE, WALL_HEIGHT, WALL_THICKNESS, applyOpenDoorGaps, carpetRectFromGrid } from './apartments.js';
+import { GRID_SIZE, WALL_HEIGHT, WALL_THICKNESS, applyOpenDoorGaps, carpetRectFromGrid, FURNITURE_GRID_SUBDIVISIONS } from './apartments.js';
 import {
   createFurnitureMesh,
   updateFurnitureMaterials,
@@ -537,11 +537,14 @@ export class SceneManager {
     return { type: 'ground', point: hits[0].point };
   }
 
-  snapToGrid(worldX, worldZ) {
-    return {
-      x: Math.round(worldX / GRID_SIZE),
-      z: Math.round(worldZ / GRID_SIZE),
-    };
+  snapToGrid(worldX, worldZ, { subdivisions = 1 } = {}) {
+    const step = GRID_SIZE / subdivisions;
+    const snap = (v) => (Math.round(v / step) * step) / GRID_SIZE;
+    return { x: snap(worldX), z: snap(worldZ) };
+  }
+
+  snapFurnitureToGrid(worldX, worldZ) {
+    return this.snapToGrid(worldX, worldZ, { subdivisions: FURNITURE_GRID_SUBDIVISIONS });
   }
 
   setPlacementGhost(type) {
@@ -644,10 +647,10 @@ export class SceneManager {
     this.carpetPreview = null;
   }
 
-  getGroundGridPosition(clientX, clientY) {
+  getGroundGridPosition(clientX, clientY, { subdivisions = FURNITURE_GRID_SUBDIVISIONS } = {}) {
     const hit = this.raycast(clientX, clientY, { includeGround: true });
     if (!hit?.point) return null;
-    return this.snapToGrid(hit.point.x, hit.point.z);
+    return this.snapToGrid(hit.point.x, hit.point.z, { subdivisions });
   }
 
   setCameraView(view) {

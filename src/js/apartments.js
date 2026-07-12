@@ -1,5 +1,7 @@
 /** Velikost jedné buňky mřížky v metrech */
 export const GRID_SIZE = 1;
+/** Jemnější krok pro nábytek — polovina buňky / střed čtverce */
+export const FURNITURE_GRID_SUBDIVISIONS = 2;
 export const WALL_HEIGHT = 2.7;
 export const WALL_THICKNESS = 0.12;
 

@@ -6,6 +6,7 @@ import {
   snapWallEndpoint,
   wallKey,
   carpetRectFromGrid,
+  FURNITURE_GRID_SUBDIVISIONS,
   GRID_SIZE,
   getPlotLayout,
   shiftWallsToPlot,
@@ -139,6 +140,7 @@ export class BytPlannerApp {
           <div class="hint-box architect-only" id="architect-hints">
             <strong>Režim architekta</strong>
             Klikni na nábytek a táhni. <kbd>R</kbd> otočí. <kbd>Del</kbd> smaže.<br />
+            Nábytek lze umístit na křižovatky mřížky, do středu čtverce i na půlku mezi čarami.<br />
             Nástroj Zeď: klikni start → konec (libovolný úhel).<br />
             Drž <kbd>Shift</kbd> pro úhly po 45°. Modrá čára = stávající byt.
           </div>
@@ -971,7 +973,7 @@ export class BytPlannerApp {
         exclude: this.cursorFollowFurniture,
       });
       if (hit?.point) {
-        const snapped = this.scene.snapToGrid(hit.point.x, hit.point.z);
+        const snapped = this.scene.snapFurnitureToGrid(hit.point.x, hit.point.z);
         this.cursorFollowFurniture.position.set(
           snapped.x * GRID_SIZE,
           0,
@@ -989,7 +991,7 @@ export class BytPlannerApp {
     });
     if (!hit?.point) return;
 
-    const snapped = this.scene.snapToGrid(hit.point.x, hit.point.z);
+    const snapped = this.scene.snapFurnitureToGrid(hit.point.x, hit.point.z);
     this.selectedFurniture.position.set(
       snapped.x * GRID_SIZE,
       0,
@@ -1043,7 +1045,7 @@ export class BytPlannerApp {
   placeFurnitureAt(hit) {
     let x, z;
     if (hit?.point) {
-      const snapped = this.scene.snapToGrid(hit.point.x, hit.point.z);
+      const snapped = this.scene.snapFurnitureToGrid(hit.point.x, hit.point.z);
       x = snapped.x;
       z = snapped.z;
     } else {
