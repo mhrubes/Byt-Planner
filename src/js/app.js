@@ -844,6 +844,9 @@ export class BytPlannerApp {
       } else if (this.tool === 'eraser') {
         extra = ' · Klikni na zeď ke smazání';
         statusHint = '→ Klikni na zeď, kterou chceš smazat';
+      } else if (this.selectedFurniture) {
+        extra = ` · Vybráno: <span class="selection-label">${this.getSelectedItemLabel()}</span>`;
+        statusHint = '→ Delete smaže · R otočí · Ctrl+C kopíruje';
       }
     }
 
@@ -854,6 +857,19 @@ export class BytPlannerApp {
     `;
 
     this.updatePlacementUI();
+  }
+
+  getSelectedItemLabel() {
+    if (!this.selectedFurniture) return '';
+    const type = this.selectedFurniture.userData.furnitureType;
+    const def = FURNITURE_CATALOG[type];
+    if (!def) return type;
+    let label = def.label;
+    if (isTvType(type)) {
+      const styleLabel = TV_STYLES[this.selectedFurniture.userData.tvStyle]?.label;
+      if (styleLabel) label += ` (${styleLabel})`;
+    }
+    return `${def.icon ?? ''} ${label}`.trim();
   }
 
   updatePlacementUI() {
@@ -1416,6 +1432,7 @@ export class BytPlannerApp {
     this.updateCarpetOptionsPanel();
     this.updateTvOptionsPanel();
     this.updatePreviewOpenablePopover();
+    this.updateStatus();
   }
 
   renderTvStyleButtons() {
@@ -1758,6 +1775,7 @@ export class BytPlannerApp {
     this.updateDoorOptionsPanel();
     this.updateCarpetOptionsPanel();
     this.updateTvOptionsPanel();
+    this.updateStatus();
   }
 
   clearSelection() {

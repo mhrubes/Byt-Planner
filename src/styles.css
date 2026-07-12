@@ -862,6 +862,11 @@ body,
   color: var(--preview);
 }
 
+.status-bar .selection-label {
+  color: var(--architect);
+  font-weight: 600;
+}
+
 .color-picker-row {
   display: flex;
   gap: 8px;

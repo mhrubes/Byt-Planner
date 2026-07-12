@@ -52,6 +52,18 @@ const FURNITURE_ITEMS = {
     legs: '#222228',
     piping: '#888892',
   },
+  armchair: {
+    label: 'Křeslo',
+    icon: '🪑',
+    size: { w: 0.88, h: 0.82, d: 0.92 },
+    color: '#4a4f5c',
+    accent: '#353a44',
+    fabricLight: '#6d7482',
+    frame: '#2a2e34',
+    legs: '#4a4e56',
+    piping: '#949aa6',
+    pillow: '#b8885a',
+  },
   tv: {
     label: 'Televize',
     icon: '📺',
@@ -420,7 +432,7 @@ export const CATALOG_CATEGORIES = [
     label: 'Obývací pokoj',
     icon: '🛋️',
     items: [
-      'sofa', 'tv', 'fireplace', 'table', 'bookshelf',
+      'sofa', 'armchair', 'tv', 'fireplace', 'table', 'bookshelf',
       'shelf_small', 'shelf_small_cabinet', 'shelf_medium', 'shelf_medium_cabinet', 'shelf_large', 'shelf_large_cabinet',
       'plant', 'plant_medium', 'plant_large', 'lamp_small', 'lamp_medium', 'lamp', 'carpet',
     ],
@@ -608,6 +620,9 @@ export function createFurnitureMesh(type, mode = 'preview', {
       break;
     case 'sofa':
       buildSofa(group, w, h, d, def, isArchitect);
+      break;
+    case 'armchair':
+      buildArmchair(group, w, h, d, def, isArchitect);
       break;
     case 'bed':
     case 'bed_single':
@@ -1278,6 +1293,68 @@ function buildSofa(group, w, h, d, def, architect) {
   addBox(group, w * 0.17, h * 0.14, d * 0.08, -w * 0.22, backCushionY + backCushionH * 0.32, backCushionZ + backCushionD * 0.52, throwColor, architect);
   addBox(group, w * 0.15, h * 0.12, d * 0.07, w * 0.28, backCushionY + backCushionH * 0.28, backCushionZ + backCushionD * 0.42, '#c8ccd4', architect);
   addBox(group, w * 0.14, h * 0.1, d * 0.06, -w * 0.2, backCushionY + backCushionH * 0.4, backCushionZ + backCushionD * 0.55, '#b0b4bc', architect);
+}
+
+function buildArmchair(group, w, h, d, def, architect) {
+  const frame = def.frame ?? '#2a2e34';
+  const fabric = def.color ?? '#4a4f5c';
+  const fabricLight = def.fabricLight ?? '#6d7482';
+  const fabricDark = def.accent ?? '#353a44';
+  const legColor = def.legs ?? '#4a4e56';
+  const piped = def.piping ?? '#949aa6';
+  const pillow = def.pillow ?? '#b8885a';
+
+  const legH = h * 0.13;
+  const baseH = h * 0.09;
+  const seatH = h * 0.24;
+  const backH = h * 0.44;
+  const armW = w * 0.13;
+  const armH = h * 0.34;
+  const gap = 0.018;
+
+  const baseY = legH + baseH / 2;
+  const seatY = legH + baseH + seatH / 2;
+  const backZ = -d * 0.35;
+  const backY = legH + baseH + seatH + backH / 2 + h * 0.015;
+
+  for (const [lx, lz] of [
+    [-w * 0.36, -d * 0.34],
+    [w * 0.36, -d * 0.34],
+    [-w * 0.36, d * 0.28],
+    [w * 0.36, d * 0.28],
+  ]) {
+    addCylinder(group, 0.011, legH, legColor, architect, { x: lx, y: legH / 2, z: lz });
+  }
+
+  addBox(group, w * 0.9, baseH, d * 0.86, 0, baseY, 0, frame, architect);
+  addBox(group, w * 0.86, 0.014, d * 0.82, 0, legH + baseH + 0.007, 0, fabricDark, architect);
+
+  const armCY = legH + baseH + armH / 2 - seatH * 0.04;
+  addBox(group, armW, armH, d * 0.8, -w / 2 + armW / 2, armCY, 0, fabricDark, architect);
+  addBox(group, armW, armH, d * 0.8, w / 2 - armW / 2, armCY, 0, fabricDark, architect);
+  addBox(group, armW * 0.82, h * 0.036, d * 0.74, -w / 2 + armW / 2, armCY + armH / 2 + h * 0.016, d * 0.02, fabricLight, architect);
+  addBox(group, armW * 0.82, h * 0.036, d * 0.74, w / 2 - armW / 2, armCY + armH / 2 + h * 0.016, d * 0.02, fabricLight, architect);
+  addBox(group, armW * 0.74, 0.005, d * 0.7, -w / 2 + armW / 2, armCY, 0, piped, architect);
+  addBox(group, armW * 0.74, 0.005, d * 0.7, w / 2 - armW / 2, armCY, 0, piped, architect);
+
+  const innerW = w - armW * 2 - gap * 3;
+  const cushionD = d * 0.54;
+  const cushionZ = d * 0.05;
+
+  addBox(group, innerW, seatH, cushionD, 0, seatY, cushionZ, fabricLight, architect);
+  addBox(group, innerW * 0.94, seatH * 0.36, cushionD * 0.94, 0, seatY + seatH * 0.48, cushionZ, fabric, architect);
+  addBox(group, innerW * 0.88, 0.006, 0.006, 0, seatY + seatH * 0.14, cushionZ + cushionD / 2 - 0.008, piped, architect);
+  addBox(group, innerW * 0.88, 0.006, 0.006, 0, seatY + seatH * 0.14, cushionZ - cushionD / 2 + 0.008, piped, architect);
+
+  addBox(group, w - armW * 1.35, backH, d * 0.14, 0, backY, backZ, fabricDark, architect);
+  addBox(group, w - armW * 1.5, backH * 0.9, d * 0.2, 0, backY + backH * 0.05, backZ + d * 0.04, fabricLight, architect);
+  addBox(group, w - armW * 1.65, backH * 0.32, d * 0.18, 0, backY + backH * 0.3, backZ + d * 0.035, fabric, architect);
+  addBox(group, w - armW * 1.55, h * 0.026, d * 0.12, 0, backY + backH / 2 + h * 0.01, backZ, fabricLight, architect);
+
+  addBox(group, w * 0.34, h * 0.2, d * 0.09, 0, backY + backH * 0.12, backZ + d * 0.1, pillow, architect, { keepColor: true });
+  addBox(group, w * 0.28, h * 0.16, d * 0.07, w * 0.08, backY + backH * 0.08, backZ + d * 0.08, '#c8ccd4', architect);
+
+  addBox(group, w * 0.82, h * 0.042, d * 0.06, 0, legH + baseH * 0.48, backZ - d * 0.012, fabricDark, architect);
 }
 
 function buildBed(group, w, h, d, def, architect) {
