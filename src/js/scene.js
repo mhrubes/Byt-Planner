@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { GRID_SIZE, WALL_HEIGHT, WALL_THICKNESS, applyOpenDoorGaps, carpetRectFromGrid, FURNITURE_GRID_SUBDIVISIONS, wallKey, findParentWall } from './apartments.js';
+import { GRID_SIZE, WALL_HEIGHT, WALL_THICKNESS, applyDoorGaps, carpetRectFromGrid, FURNITURE_GRID_SUBDIVISIONS, wallKey, findParentWall, findWallForDoor } from './apartments.js';
 import {
   createFurnitureMesh,
   updateFurnitureMaterials,
@@ -362,8 +362,8 @@ export class SceneManager {
 
     const isPreview = this.mode === 'preview';
 
-    const openDoors = this.furnitureGroup.children
-      .filter((f) => f.userData.doorOpen && isDoorType(f.userData.furnitureType))
+    const doors = this.furnitureGroup.children
+      .filter((f) => isDoorType(f.userData.furnitureType))
       .map((f) => ({
         type: f.userData.furnitureType,
         x: f.position.x / GRID_SIZE,
@@ -371,9 +371,9 @@ export class SceneManager {
         rotation: f.rotation.y,
       }));
 
-    const wallsToRender = applyOpenDoorGaps(
+    const wallsToRender = applyDoorGaps(
       this.walls,
-      openDoors,
+      doors,
       FURNITURE_CATALOG,
       GRID_SIZE
     );
@@ -381,6 +381,11 @@ export class SceneManager {
     for (const w of wallsToRender) {
       const mesh = this.createWallMesh(w, isPreview);
       if (mesh) this.wallsGroup.add(mesh);
+    }
+
+    for (const door of doors) {
+      const lintel = this.createDoorLintel(door, isPreview);
+      if (lintel) this.wallsGroup.add(lintel);
     }
 
     this.updateWallSelectionHighlight();
@@ -426,6 +431,54 @@ export class SceneManager {
     return mesh;
   }
 
+  createDoorLintel(door, isPreview) {
+    const def = FURNITURE_CATALOG[door.type];
+    if (!def) return null;
+
+    const doorH = def.size.h;
+    const doorW = def.size.w;
+    const lintelH = WALL_HEIGHT - doorH;
+    if (lintelH < 0.04) return null;
+
+    const parentWall = findWallForDoor(door, this.walls, FURNITURE_CATALOG, GRID_SIZE);
+    const colorSegment = parentWall ?? {
+      x1: door.x,
+      z1: door.z,
+      x2: door.x,
+      z2: door.z,
+    };
+
+    const geo = new THREE.BoxGeometry(doorW, lintelH, WALL_THICKNESS);
+    const mat = isPreview
+      ? new THREE.MeshStandardMaterial({
+          color: this.resolveWallColor(colorSegment),
+          roughness: 0.9,
+          metalness: 0,
+          emissive: 0x000000,
+          emissiveIntensity: 0,
+        })
+      : new THREE.MeshLambertMaterial({
+          color: 0xd4d8e0,
+          transparent: true,
+          opacity: 0.92,
+        });
+
+    const mesh = new THREE.Mesh(geo, mat);
+    const px = door.x * GRID_SIZE;
+    const pz = door.z * GRID_SIZE;
+    const r = door.rotation ?? 0;
+
+    mesh.position.set(px, doorH + lintelH / 2, pz);
+    mesh.rotation.y = r;
+    mesh.castShadow = isPreview;
+    mesh.receiveShadow = isPreview;
+    mesh.userData.isWall = true;
+    mesh.userData.isDoorLintel = true;
+    mesh.userData.wallSegment = parentWall ? { ...parentWall } : { ...colorSegment };
+
+    return mesh;
+  }
+
   clearFurniture() {
     while (this.furnitureGroup.children.length) {
       const f = this.furnitureGroup.children[0];
@@ -461,7 +514,7 @@ export class SceneManager {
       applyDoorOpenState(mesh, doorOpen);
     }
     this.furnitureGroup.add(mesh);
-    if (doorOpen && isDoorType(type)) this.refreshWallOpenings();
+    if (isDoorType(type)) this.refreshWallOpenings();
     return mesh;
   }
 

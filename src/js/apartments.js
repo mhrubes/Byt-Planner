@@ -82,8 +82,7 @@ export const APARTMENT_TEMPLATES = {
       { x1: 0, z1: 6, x2: 0, z2: 0 },
       // Koupelna (levý horní roh 3×2)
       { x1: 0, z1: 2, x2: 3, z2: 2 },
-      { x1: 3, z1: 0, x2: 3, z2: 0.55 },
-      { x1: 3, z1: 1.45, x2: 3, z2: 2 },
+      { x1: 3, z1: 0, x2: 3, z2: 2 },
       // Kuchyňský kout (pravý dolní 3×2, otevřený do obýváku)
       { x1: 5, z1: 4, x2: 8, z2: 4 },
       { x1: 5, z1: 4, x2: 5, z2: 6 },
@@ -156,17 +155,13 @@ export const APARTMENT_TEMPLATES = {
       { x1: 10, z1: 8, x2: 0, z2: 8 },
       { x1: 0, z1: 8, x2: 0, z2: 0 },
       // Ložnice (0,0)–(5,4)
-      { x1: 0, z1: 4, x2: 2, z2: 4 },
-      { x1: 3, z1: 4, x2: 5, z2: 4 },
+      { x1: 0, z1: 4, x2: 5, z2: 4 },
       { x1: 5, z1: 0, x2: 5, z2: 4 },
       // Koupelna (5,0)–(8,3)
-      { x1: 5, z1: 0, x2: 5, z2: 1.05 },
-      { x1: 5, z1: 1.95, x2: 5, z2: 3 },
       { x1: 5, z1: 3, x2: 8, z2: 3 },
       { x1: 8, z1: 0, x2: 8, z2: 3 },
       // Kuchyně (8,0)–(10,3)
-      { x1: 8, z1: 3, x2: 8.55, z2: 3 },
-      { x1: 9.45, z1: 3, x2: 10, z2: 3 },
+      { x1: 8, z1: 3, x2: 10, z2: 3 },
       { x1: 8, z1: 0, x2: 8, z2: 3 },
     ],
     defaultFurniture: [
@@ -249,17 +244,12 @@ export const APARTMENT_TEMPLATES = {
       { x1: 0, z1: 12, x2: 0, z2: 0 },
       // Ložnice 1 (0,0)–(6,6) a ložnice 2 (0,6)–(6,12)
       { x1: 0, z1: 6, x2: 6, z2: 6 },
-      { x1: 6, z1: 0, x2: 6, z2: 1.05 },
-      { x1: 6, z1: 1.95, x2: 6, z2: 3.55 },
-      { x1: 6, z1: 4.45, x2: 6, z2: 6 },
-      { x1: 6, z1: 6, x2: 6, z2: 8.55 },
-      { x1: 6, z1: 9.45, x2: 6, z2: 12 },
+      { x1: 6, z1: 0, x2: 6, z2: 12 },
       // Koupelna (6,0)–(9,4)
-      { x1: 6, z1: 4, x2: 9, z2: 4 },
+      { x1: 6.5, z1: 4, x2: 9, z2: 4 },
       { x1: 9, z1: 0, x2: 9, z2: 4 },
       // Kuchyně (9,0)–(16,5)
-      { x1: 9, z1: 5, x2: 11.55, z2: 5 },
-      { x1: 12.45, z1: 5, x2: 16, z2: 5 },
+      { x1: 9, z1: 5, x2: 16, z2: 5 },
       { x1: 9, z1: 0, x2: 9, z2: 5 },
       // Obývák — částečná příčka u chodby
       { x1: 6, z1: 9, x2: 11, z2: 9 },
@@ -482,11 +472,44 @@ function splitWallByOpening(wall, ox1, oz1, ox2, oz2, gridSize) {
   return pieces;
 }
 
-/** Vyřízne z otevřených dveří mezeru ve zdi */
-export function applyOpenDoorGaps(walls, openDoors, catalog, gridSize = GRID_SIZE) {
+/** Najde zeď, na které dveře leží (pro barvu nadpraží) */
+export function findWallForDoor(door, walls, catalog, gridSize = GRID_SIZE) {
+  const def = catalog[door.type];
+  if (!def) return null;
+
+  const r = door.rotation ?? 0;
+  const ux = Math.cos(r);
+  const uz = -Math.sin(r);
+
+  let best = null;
+  let bestDist = Infinity;
+
+  for (const raw of walls) {
+    const w = normalizeWall(raw);
+    const wdx = w.x2 - w.x1;
+    const wdz = w.z2 - w.z1;
+    const wlen = Math.hypot(wdx, wdz);
+    if (wlen < 0.01) continue;
+
+    const wux = wdx / wlen;
+    const wuz = wdz / wlen;
+    if (Math.abs(ux * wuz - uz * wux) > 0.08) continue;
+
+    const dist = distPointToSegment(door.x, door.z, w.x1, w.z1, w.x2, w.z2);
+    if (dist < 0.15 && dist < bestDist) {
+      bestDist = dist;
+      best = w;
+    }
+  }
+
+  return best;
+}
+
+/** Vyřízne vodorovnou mezeru pro dveře ve zdi (šířka dveří, po celé výšce segmentu) */
+export function applyDoorGaps(walls, doors, catalog, gridSize = GRID_SIZE) {
   let result = walls.map((w) => ({ ...w }));
 
-  for (const door of openDoors) {
+  for (const door of doors) {
     const def = catalog[door.type];
     if (!def) continue;
 
@@ -509,4 +532,9 @@ export function applyOpenDoorGaps(walls, openDoors, catalog, gridSize = GRID_SIZ
   }
 
   return result;
+}
+
+/** @deprecated alias — použij applyDoorGaps */
+export function applyOpenDoorGaps(walls, openDoors, catalog, gridSize = GRID_SIZE) {
+  return applyDoorGaps(walls, openDoors, catalog, gridSize);
 }

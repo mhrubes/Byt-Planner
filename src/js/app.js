@@ -1030,7 +1030,7 @@ export class BytPlannerApp {
       0,
       snapped.z * GRID_SIZE
     );
-    if (isDoorType(this.selectedFurniture.userData.furnitureType) && this.selectedFurniture.userData.doorOpen) {
+    if (isDoorType(this.selectedFurniture.userData.furnitureType)) {
       this.scene.refreshWallOpenings();
     }
   }
@@ -1396,7 +1396,7 @@ export class BytPlannerApp {
 
   removeFurnitureObject(obj) {
     if (!obj) return;
-    const wasOpenDoor = isDoorType(obj.userData.furnitureType) && obj.userData.doorOpen;
+    const wasDoor = isDoorType(obj.userData.furnitureType);
     obj.traverse((c) => {
       if (c.geometry) c.geometry.dispose();
       if (c.material) c.material.dispose();
@@ -1404,7 +1404,7 @@ export class BytPlannerApp {
     this.scene.furnitureGroup.remove(obj);
     if (this.cursorFollowFurniture === obj) this.cursorFollowFurniture = null;
     if (this.selectedFurniture === obj) this.selectedFurniture = null;
-    if (wasOpenDoor) this.scene.refreshWallOpenings();
+    if (wasDoor) this.scene.refreshWallOpenings();
     this.updateDoorOptionsPanel();
     this.updateCarpetOptionsPanel();
   }
@@ -1508,7 +1508,7 @@ export class BytPlannerApp {
     if (!this.selectedFurniture || this.mode !== 'architect') return;
     if (!this.selectedFurniture.userData.rotatable) return;
     this.selectedFurniture.rotation.y += Math.PI / 2;
-    if (isDoorType(this.selectedFurniture.userData.furnitureType) && this.selectedFurniture.userData.doorOpen) {
+    if (isDoorType(this.selectedFurniture.userData.furnitureType)) {
       this.scene.refreshWallOpenings();
     }
     this.scheduleSave();
