@@ -616,6 +616,59 @@ export function findWallForDoor(door, walls, catalog, gridSize = GRID_SIZE) {
   return best;
 }
 
+/** Směr zdi v radiánech (osa segmentu x1,z1 → x2,z2) */
+export function getWallYaw(wall) {
+  const w = normalizeWall(wall);
+  return Math.atan2(w.z2 - w.z1, w.x2 - w.x1);
+}
+
+export function normalizeAngleRad(angle) {
+  let a = angle % (Math.PI * 2);
+  if (a > Math.PI) a -= Math.PI * 2;
+  if (a < -Math.PI) a += Math.PI * 2;
+  return a;
+}
+
+/** Nejbližší zeď k bodu — bez ohledu na natočení otvoru */
+export function findNearestWallAt(x, z, walls, maxDist = 0.15) {
+  let best = null;
+  let bestDist = Infinity;
+
+  for (const raw of walls) {
+    const w = normalizeWall(raw);
+    const dist = distPointToSegment(x, z, w.x1, w.z1, w.x2, w.z2);
+    if (dist < maxDist && dist < bestDist) {
+      bestDist = dist;
+      best = w;
+    }
+  }
+
+  return best;
+}
+
+/** Zarovná otvor do zdi — dvě možné orientace po ose zdi (0° / 180°) */
+export function snapOpeningRotationToWall(currentYaw, wallYaw) {
+  const options = [wallYaw, wallYaw + Math.PI];
+  let best = options[0];
+  let bestDiff = Infinity;
+
+  for (const option of options) {
+    const diff = Math.abs(normalizeAngleRad(option - currentYaw));
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      best = option;
+    }
+  }
+
+  return normalizeAngleRad(best);
+}
+
+/** Je otvor zarovnaný na zeď (pro otočení o 180° místo volného úhlu) */
+export function isOpeningOnWall(opening, walls, catalog = null, gridSize = GRID_SIZE) {
+  if (findWallForDoor(opening, walls, catalog, gridSize)) return true;
+  return !!findNearestWallAt(opening.x, opening.z, walls);
+}
+
 /** Vyřízne vodorovnou mezeru pro dveře ve zdi (šířka dveří, po celé výšce segmentu) */
 export function applyDoorGaps(walls, doors, catalog, gridSize = GRID_SIZE) {
   let result = walls.map((w) => ({ ...w }));
