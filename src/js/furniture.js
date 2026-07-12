@@ -44,8 +44,12 @@ const FURNITURE_ITEMS = {
     label: 'Pohovka',
     icon: '🛋️',
     size: { w: 2.0, h: 0.85, d: 0.9 },
-    color: '#6b5344',
-    accent: '#8b7355',
+    color: '#5c5c66',
+    accent: '#42424a',
+    fabricLight: '#70707a',
+    frame: '#35353d',
+    legs: '#222228',
+    piping: '#888892',
   },
   tv: {
     label: 'Televize',
@@ -333,6 +337,8 @@ const FURNITURE_ITEMS = {
     size: { w: 0.4, h: 0.75, d: 0.65 },
     color: '#f5f5f5',
     accent: '#e0e0e0',
+    inner: '#e8edf0',
+    seat: '#f2f2f4',
   },
   sink: {
     label: 'Umyvadlo',
@@ -533,10 +539,7 @@ export function createFurnitureMesh(type, mode = 'preview', {
       buildRadiator(group, w, h, d, def, isArchitect);
       break;
     case 'sofa':
-      addBox(group, w, h * 0.5, d, 0, h * 0.25, 0, def.color, isArchitect);
-      addBox(group, w, h * 0.35, d * 0.15, 0, h * 0.575, -d * 0.425, def.accent, isArchitect);
-      addBox(group, w * 0.12, h * 0.25, d, -w * 0.44, h * 0.375, 0, def.accent, isArchitect);
-      addBox(group, w * 0.12, h * 0.25, d, w * 0.44, h * 0.375, 0, def.accent, isArchitect);
+      buildSofa(group, w, h, d, def, isArchitect);
       break;
     case 'bed':
     case 'bed_single':
@@ -835,6 +838,101 @@ function buildDesk(group, w, h, d, def, architect) {
 function addPillow(group, x, y, z, pw, ph, pd, architect) {
   addBox(group, pw, ph, pd, x, y, z, '#ffffff', architect);
   addBox(group, pw * 0.88, ph * 0.18, pd * 0.82, x, y + ph * 0.22, z + pd * 0.04, '#f0f0f0', architect);
+}
+
+function buildSofa(group, w, h, d, def, architect) {
+  const frame = def.frame ?? '#35353d';
+  const fabric = def.color ?? '#5c5c66';
+  const fabricLight = def.fabricLight ?? '#70707a';
+  const fabricDark = def.accent ?? '#42424a';
+  const legColor = def.legs ?? '#222228';
+  const piped = def.piping ?? '#888892';
+  const throwColor = '#9a9ea8';
+
+  const legH = h * 0.12;
+  const baseH = h * 0.14;
+  const seatH = h * 0.22;
+  const backH = h * 0.4;
+  const armH = h * 0.34;
+  const armW = w * 0.075;
+  const gap = 0.022;
+
+  const baseY = legH + baseH / 2;
+  const seatY = legH + baseH + seatH / 2;
+  const backZ = -d * 0.38;
+  const backY = legH + baseH + backH / 2 + seatH * 0.12;
+
+  for (const [lx, lz] of [
+    [-w * 0.42, -d * 0.36],
+    [w * 0.42, -d * 0.36],
+    [-w * 0.42, d * 0.3],
+    [w * 0.42, d * 0.3],
+    [0, -d * 0.36],
+    [0, d * 0.3],
+  ]) {
+    addCylinder(group, 0.018, legH, legColor, architect, { x: lx, y: legH / 2, z: lz });
+  }
+
+  addBox(group, w * 0.98, baseH, d * 0.92, 0, baseY, 0, frame, architect);
+  addBox(group, w * 0.94, 0.018, d * 0.88, 0, legH + baseH + 0.009, 0, fabricDark, architect);
+
+  const armCY = legH + baseH + armH / 2 - seatH * 0.04;
+  addBox(group, armW, armH, d * 0.9, -w / 2 + armW / 2, armCY, 0, fabricDark, architect);
+  addBox(group, armW, armH, d * 0.9, w / 2 - armW / 2, armCY, 0, fabricDark, architect);
+  addBox(group, armW * 0.9, h * 0.038, d * 0.84, -w / 2 + armW / 2, armCY + armH / 2 + h * 0.018, d * 0.02, fabricLight, architect);
+  addBox(group, armW * 0.9, h * 0.038, d * 0.84, w / 2 - armW / 2, armCY + armH / 2 + h * 0.018, d * 0.02, fabricLight, architect);
+  addBox(group, armW * 0.82, 0.006, d * 0.78, -w / 2 + armW / 2, armCY, 0, piped, architect);
+  addBox(group, armW * 0.82, 0.006, d * 0.78, w / 2 - armW / 2, armCY, 0, piped, architect);
+
+  const innerW = w - armW * 2 - gap * 4;
+  const cushionW = (innerW - gap * 2) / 3;
+  const cushionD = d * 0.56;
+  const cushionZ = d * 0.07;
+
+  for (let i = 0; i < 3; i++) {
+    const cx = -innerW / 2 + cushionW / 2 + gap + i * (cushionW + gap);
+    addBox(group, cushionW, seatH, cushionD, cx, seatY, cushionZ, fabricLight, architect);
+    addBox(group, cushionW * 0.92, seatH * 0.38, cushionD * 0.92, cx, seatY + seatH * 0.52, cushionZ, fabric, architect);
+    addBox(group, cushionW * 0.86, 0.006, 0.006, cx, seatY + seatH * 0.15, cushionZ + cushionD / 2 - 0.008, piped, architect);
+    addBox(group, cushionW * 0.86, 0.006, 0.006, cx, seatY + seatH * 0.15, cushionZ - cushionD / 2 + 0.008, piped, architect);
+  }
+
+  addBox(group, w - armW * 1.7, backH, d * 0.13, 0, backY, backZ, fabricDark, architect);
+  addBox(group, w - armW * 1.8, h * 0.028, d * 0.11, 0, backY + backH / 2 + h * 0.012, backZ, fabricLight, architect);
+
+  const backCushionH = backH * 0.86;
+  const backCushionD = d * 0.21;
+  const backCushionZ = backZ + d * 0.055;
+  const backCushionY = legH + baseH + seatH + backCushionH / 2 + h * 0.018;
+
+  for (let i = 0; i < 3; i++) {
+    const cx = -innerW / 2 + cushionW / 2 + gap + i * (cushionW + gap);
+    addBox(group, cushionW * 0.96, backCushionH, backCushionD, cx, backCushionY, backCushionZ, fabricLight, architect);
+    addBox(
+      group,
+      cushionW * 0.88,
+      backCushionH * 0.28,
+      backCushionD * 0.9,
+      cx,
+      backCushionY + backCushionH * 0.3,
+      backCushionZ - backCushionD * 0.04,
+      fabric,
+      architect
+    );
+    addCylinder(group, 0.011, 0.007, piped, architect, {
+      x: cx,
+      y: backCushionY + backCushionH * 0.12,
+      z: backCushionZ + backCushionD * 0.34,
+    });
+    addBox(group, cushionW * 0.84, 0.006, 0.006, cx, backCushionY - backCushionH * 0.38, backCushionZ + backCushionD / 2 - 0.008, piped, architect);
+  }
+
+  addBox(group, w * 0.9, h * 0.05, d * 0.07, 0, legH + baseH * 0.52, backZ - d * 0.015, fabricDark, architect);
+  addBox(group, w * 0.96, h * 0.022, 0.012, 0, legH + baseH * 0.28, d * 0.43, fabricDark, architect);
+
+  addBox(group, w * 0.17, h * 0.14, d * 0.08, -w * 0.22, backCushionY + backCushionH * 0.32, backCushionZ + backCushionD * 0.52, throwColor, architect);
+  addBox(group, w * 0.15, h * 0.12, d * 0.07, w * 0.28, backCushionY + backCushionH * 0.28, backCushionZ + backCushionD * 0.42, '#c8ccd4', architect);
+  addBox(group, w * 0.14, h * 0.1, d * 0.06, -w * 0.2, backCushionY + backCushionH * 0.4, backCushionZ + backCushionD * 0.55, '#b0b4bc', architect);
 }
 
 function buildBed(group, w, h, d, def, architect) {
@@ -1555,9 +1653,109 @@ function buildLampLarge(group, w, h, d, def, architect) {
 }
 
 function buildToilet(group, w, h, d, def, architect) {
-  addBox(group, w * 0.55, h * 0.45, d * 0.35, 0, h * 0.78, -d * 0.28, def.accent, architect);
-  addBox(group, w * 0.85, h * 0.35, d * 0.75, 0, h * 0.2, d * 0.05, def.color, architect);
-  addBox(group, w * 0.7, h * 0.08, d * 0.55, 0, h * 0.42, -d * 0.05, def.accent, architect);
+  const inner = def.inner ?? '#e8edf0';
+  const innerDark = '#c8d4dc';
+  const chrome = '#b0b8c0';
+  const chromeDark = '#889098';
+  const seatColor = def.seat ?? '#f2f2f4';
+
+  const baseH = h * 0.065;
+  const boltY = baseH * 0.4;
+
+  addCylinder(group, 0.012, 0.016, chrome, architect, { x: -w * 0.18, y: boltY, z: d * 0.22 });
+  addCylinder(group, 0.012, 0.016, chrome, architect, { x: w * 0.18, y: boltY, z: d * 0.22 });
+
+  addBox(group, w * 0.78, baseH, d * 0.48, 0, baseH / 2, d * 0.04, def.accent, architect);
+  addBox(group, w * 0.62, h * 0.12, d * 0.34, 0, baseH + h * 0.06, d * 0.02, def.color, architect);
+
+  const bowlBaseY = baseH + h * 0.02;
+  const bowlH = h * 0.36;
+  const bowlCY = bowlBaseY + bowlH / 2;
+  const bowlZ = d * 0.05;
+
+  addBox(group, w * 0.82, bowlH, d * 0.55, 0, bowlCY, bowlZ, def.color, architect);
+  addCylinder(group, w * 0.09, bowlH * 0.92, def.color, architect, { x: -w * 0.36, y: bowlCY, z: bowlZ + d * 0.02 });
+  addCylinder(group, w * 0.09, bowlH * 0.92, def.color, architect, { x: w * 0.36, y: bowlCY, z: bowlZ + d * 0.02 });
+
+  const holeW = w * 0.52;
+  const holeD = d * 0.34;
+  const holeZ = bowlZ + d * 0.1;
+  const rimBaseY = bowlBaseY + bowlH;
+  const basinDepth = h * 0.12;
+  const basinFloorY = rimBaseY - basinDepth;
+
+  addBox(group, holeW * 0.82, 0.018, holeD * 0.82, 0, basinFloorY, holeZ, innerDark, architect);
+  addCylinder(group, 0.048, 0.02, '#707880', architect, { x: 0, y: basinFloorY + 0.01, z: holeZ + holeD * 0.12 });
+
+  const cavityH = basinDepth * 0.88;
+  const cavityCY = basinFloorY + cavityH / 2;
+  addBox(group, 0.028, cavityH, holeD * 0.86, -holeW / 2 + 0.018, cavityCY, holeZ, inner, architect);
+  addBox(group, 0.028, cavityH, holeD * 0.86, holeW / 2 - 0.018, cavityCY, holeZ, inner, architect);
+  addBox(group, holeW * 0.86, cavityH, 0.028, 0, cavityCY, holeZ - holeD / 2 + 0.018, inner, architect);
+  addBox(group, holeW * 0.7, cavityH * 0.65, 0.028, 0, cavityCY - cavityH * 0.12, holeZ + holeD / 2 - 0.018, inner, architect);
+
+  const rimThick = h * 0.038;
+  const rimY = rimBaseY + rimThick / 2;
+  const rimOuterW = w * 0.78;
+  const rimOuterD = d * 0.48;
+  const rimFrontD = rimOuterD / 2 - holeZ - holeD / 2;
+  const rimBackD = rimOuterD / 2 + holeZ - holeD / 2;
+  const rimSideW = (rimOuterW - holeW) / 2;
+
+  if (rimFrontD > 0.015) {
+    addBox(group, rimOuterW, rimThick, rimFrontD, 0, rimY, holeZ - holeD / 2 - rimFrontD / 2, def.accent, architect);
+  }
+  if (rimBackD > 0.015) {
+    addBox(group, rimOuterW, rimThick, rimBackD, 0, rimY, holeZ + holeD / 2 + rimBackD / 2, def.accent, architect);
+  }
+  addBox(group, rimSideW, rimThick, holeD, -rimOuterW / 2 + rimSideW / 2, rimY, holeZ, def.accent, architect);
+  addBox(group, rimSideW, rimThick, holeD, rimOuterW / 2 - rimSideW / 2, rimY, holeZ, def.accent, architect);
+
+  const seatThick = h * 0.032;
+  const seatY = rimBaseY + rimThick + seatThick / 2 + h * 0.006;
+  const seatOuterW = holeW * 1.14;
+  const seatOuterD = holeD * 1.18;
+  const seatInnerW = holeW * 0.58;
+  const seatInnerD = holeD * 0.62;
+  const seatSideW = (seatOuterW - seatInnerW) / 2;
+  const seatFrontD = (seatOuterD - seatInnerD) / 2;
+
+  addBox(group, seatOuterW, seatThick, seatFrontD, 0, seatY, holeZ - seatInnerD / 2 - seatFrontD / 2, seatColor, architect);
+  addBox(group, seatOuterW, seatThick, seatFrontD, 0, seatY, holeZ + seatInnerD / 2 + seatFrontD / 2, seatColor, architect);
+  addBox(group, seatSideW, seatThick, seatInnerD, -seatOuterW / 2 + seatSideW / 2, seatY, holeZ, seatColor, architect);
+  addBox(group, seatSideW, seatThick, seatInnerD, seatOuterW / 2 - seatSideW / 2, seatY, holeZ, seatColor, architect);
+
+  const lidThick = h * 0.026;
+  const lidY = seatY + seatThick / 2 + lidThick / 2 + h * 0.008;
+  addBox(group, seatOuterW * 0.94, lidThick, seatOuterD * 0.88, 0, lidY, holeZ - d * 0.02, def.color, architect);
+  addBox(group, seatOuterW * 0.7, lidThick * 0.5, seatOuterD * 0.55, 0, lidY + lidThick * 0.15, holeZ + holeD * 0.08, def.accent, architect);
+
+  const hingeZ = holeZ - holeD * 0.42;
+  addBox(group, 0.038, 0.022, 0.055, -w * 0.14, seatY, hingeZ, chromeDark, architect);
+  addBox(group, 0.038, 0.022, 0.055, w * 0.14, seatY, hingeZ, chromeDark, architect);
+
+  const connY = bowlBaseY + bowlH + h * 0.05;
+  addBox(group, w * 0.46, h * 0.1, d * 0.16, 0, connY, -d * 0.04, def.accent, architect);
+
+  const tankW = w * 0.74;
+  const tankD = d * 0.26;
+  const tankH = h * 0.4;
+  const tankZ = -d * 0.2;
+  const tankY = connY + tankH / 2 - h * 0.02;
+
+  addBox(group, tankW, tankH, tankD, 0, tankY, tankZ, def.color, architect);
+  addBox(group, 0.018, tankH * 0.92, tankD * 0.88, -tankW / 2 + 0.01, tankY, tankZ, def.accent, architect);
+  addBox(group, 0.018, tankH * 0.92, tankD * 0.88, tankW / 2 - 0.01, tankY, tankZ, def.accent, architect);
+  addBox(group, tankW * 0.97, h * 0.022, tankD * 0.97, 0, tankY + tankH / 2 + h * 0.01, tankZ, def.accent, architect);
+  addBox(group, tankW * 0.55, h * 0.012, tankD * 0.7, 0, tankY + tankH / 2 + h * 0.022, tankZ, '#eceef0', architect);
+
+  const btnY = tankY + tankH / 2 + h * 0.038;
+  addCylinder(group, 0.034, 0.014, chrome, architect, { x: -tankW * 0.13, y: btnY, z: tankZ });
+  addCylinder(group, 0.024, 0.014, chromeDark, architect, { x: tankW * 0.13, y: btnY, z: tankZ });
+  addCylinder(group, 0.008, 0.006, '#d8dce0', architect, { x: -tankW * 0.13, y: btnY + 0.01, z: tankZ });
+  addCylinder(group, 0.006, 0.006, '#d0d4d8', architect, { x: tankW * 0.13, y: btnY + 0.01, z: tankZ });
+
+  addBox(group, 0.04, h * 0.08, 0.04, tankW / 2 + 0.01, tankY - tankH * 0.15, tankZ + tankD * 0.2, chrome, architect);
 }
 
 function buildSink(group, w, h, d, def, architect) {
