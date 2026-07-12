@@ -10,7 +10,7 @@ import {
   shiftWallsToPlot,
   shiftFurnitureToPlot,
 } from './apartments.js';
-import { FURNITURE_CATALOG, CATALOG_CATEGORIES, isDoorType, applyDoorOpenState } from './furniture.js';
+import { FURNITURE_CATALOG, CATALOG_CATEGORIES, isDoorType, isOpenableType, applyDoorOpenState } from './furniture.js';
 import { SceneManager } from './scene.js';
 import { loadSave, writeSave, clearSave } from './storage.js';
 
@@ -90,7 +90,7 @@ export class BytPlannerApp {
           </section>
 
           <section class="panel-section architect-only hidden" id="door-options">
-            <h3>Dveře</h3>
+            <h3 id="openable-options-title">Dveře a okna</h3>
             <button type="button" class="save-btn" id="door-open-toggle">🚪 Otevřít průchod</button>
             <p class="save-hint" id="door-open-hint">Přepne otevřený průchod ve zdi · klávesa <kbd>O</kbd></p>
           </section>
@@ -175,6 +175,7 @@ export class BytPlannerApp {
     this.leftPanelToggle = this.root.querySelector('#left-panel-toggle');
     this.doorOptionsPanel = this.root.querySelector('#door-options');
     this.doorOpenToggle = this.root.querySelector('#door-open-toggle');
+    this.openableOptionsTitle = this.root.querySelector('#openable-options-title');
     this.applyLeftPanelCollapsed(this.leftPanelCollapsed);
 
     const aptBtns = this.root.querySelector('#apartment-btns');
@@ -852,25 +853,39 @@ export class BytPlannerApp {
   }
 
   updateDoorOptionsPanel() {
-    const door = this.selectedFurniture;
-    const isDoor = door && isDoorType(door.userData.furnitureType);
+    const item = this.selectedFurniture;
+    const isOpenable = item && isOpenableType(item.userData.furnitureType);
+    const isDoor = item && isDoorType(item.userData.furnitureType);
+    const isWindow = item?.userData.furnitureType === 'window';
 
-    this.doorOptionsPanel?.classList.toggle('hidden', !isDoor || this.mode !== 'architect');
+    this.doorOptionsPanel?.classList.toggle('hidden', !isOpenable || this.mode !== 'architect');
 
-    if (!isDoor || !this.doorOpenToggle) return;
+    if (!isOpenable || !this.doorOpenToggle) return;
 
-    const open = !!door.userData.doorOpen;
-    this.doorOpenToggle.textContent = open ? '🔒 Zavřít průchod' : '🚪 Otevřít průchod';
+    const open = !!item.userData.doorOpen;
+    if (isWindow) {
+      this.openableOptionsTitle.textContent = 'Okno';
+      this.doorOpenToggle.textContent = open ? '🔒 Zavřít okno' : '🪟 Otevřít okno';
+      this.root.querySelector('#door-open-hint').textContent =
+        'Vyklopí křídlo okna · klávesa O';
+    } else {
+      this.openableOptionsTitle.textContent = isDoor ? 'Dveře' : 'Balkónové dveře';
+      this.doorOpenToggle.textContent = open ? '🔒 Zavřít průchod' : '🚪 Otevřít průchod';
+      this.root.querySelector('#door-open-hint').textContent =
+        'Přepne otevřený průchod ve zdi · klávesa O';
+    }
     this.doorOpenToggle.classList.toggle('active', open);
   }
 
   toggleSelectedDoorOpen() {
     if (!this.selectedFurniture || this.mode !== 'architect') return;
-    if (!isDoorType(this.selectedFurniture.userData.furnitureType)) return;
+    if (!isOpenableType(this.selectedFurniture.userData.furnitureType)) return;
 
     const next = !this.selectedFurniture.userData.doorOpen;
     applyDoorOpenState(this.selectedFurniture, next);
-    this.scene.refreshWallOpenings();
+    if (isDoorType(this.selectedFurniture.userData.furnitureType)) {
+      this.scene.refreshWallOpenings();
+    }
     this.updateDoorOptionsPanel();
     this.scheduleSave();
   }

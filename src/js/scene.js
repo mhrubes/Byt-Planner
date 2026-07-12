@@ -6,6 +6,7 @@ import {
   updateFurnitureMaterials,
   FURNITURE_CATALOG,
   isDoorType,
+  isOpenableType,
   applyDoorOpenState,
 } from './furniture.js';
 
@@ -388,7 +389,7 @@ export class SceneManager {
     if (!mesh) return null;
     mesh.position.set(x * GRID_SIZE, 0, z * GRID_SIZE);
     mesh.rotation.y = rotation;
-    if (isDoorType(type)) {
+    if (isOpenableType(type)) {
       applyDoorOpenState(mesh, doorOpen);
     }
     this.furnitureGroup.add(mesh);
@@ -408,7 +409,7 @@ export class SceneManager {
         z: f.position.z / GRID_SIZE,
         rotation: f.rotation.y,
       };
-      if (isDoorType(item.type)) {
+      if (isOpenableType(item.type)) {
         item.doorOpen = !!f.userData.doorOpen;
       }
       return item;
@@ -455,6 +456,27 @@ export class SceneManager {
     });
 
     if (hits.length === 0) return null;
+
+    for (const hit of hits) {
+      let obj = hit.object;
+      while (obj) {
+        if (obj.userData?.isFurniture) {
+          let furniture = obj;
+          while (furniture.parent && furniture.parent !== this.furnitureGroup) {
+            furniture = furniture.parent;
+          }
+          return { type: 'furniture', object: furniture, point: hit.point };
+        }
+        if (obj.parent?.userData?.isFurniture) {
+          let furniture = obj.parent;
+          while (furniture.parent && furniture.parent !== this.furnitureGroup) {
+            furniture = furniture.parent;
+          }
+          return { type: 'furniture', object: furniture, point: hit.point };
+        }
+        obj = obj.parent;
+      }
+    }
 
     let obj = hits[0].object;
     while (obj.parent && !obj.userData.isFurniture && !obj.userData.isWall) {

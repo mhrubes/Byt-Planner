@@ -15,9 +15,11 @@ const FURNITURE_ITEMS = {
   window: {
     label: 'Okno',
     icon: '🪟',
-    size: { w: 1.2, h: 1.4, d: 0.1 },
-    color: '#ffffff',
-    accent: '#dde4ea',
+    size: { w: 1.2, h: 1.4, d: 0.14 },
+    color: '#f5f8fc',
+    accent: '#2563b0',
+    inner: '#dce8f5',
+    back: '#8eb4e8',
     sillHeight: 0.9,
     structural: true,
   },
@@ -196,9 +198,14 @@ export const CATALOG_CATEGORIES = [
 export const FURNITURE_CATALOG = { ...FURNITURE_ITEMS };
 
 export const DOOR_TYPES = new Set(['door', 'balcony_door']);
+export const OPENABLE_TYPES = new Set(['door', 'balcony_door', 'window']);
 
 export function isDoorType(type) {
   return DOOR_TYPES.has(type);
+}
+
+export function isOpenableType(type) {
+  return OPENABLE_TYPES.has(type);
 }
 
 let furnitureIdCounter = 0;
@@ -424,19 +431,57 @@ function buildWindow(group, w, h, d, def, architect) {
   const frame = 0.07;
   const glassW = w - frame * 2;
   const glassH = h - frame * 2;
+  const winD = Math.max(d * 1.1, 0.18);
 
-  addBox(group, w + 0.06, h + frame * 2, d * 0.55, 0, cy, 0, def.color, architect, {
+  addBox(group, w + 0.08, h + frame * 2 + 0.04, winD * 0.95, 0, cy, 0, def.accent, architect, {
     keepColor: true,
-    emissive: '#888888',
+    emissive: '#1a5080',
+    partRole: 'frame',
+    doubleSided: true,
   });
-  addBox(group, glassW, glassH, d * 0.25, 0, cy, d * 0.22, '#7ec8ff', architect, {
+  addBox(group, w + 0.02, h + 0.02, winD * 0.92, 0, cy, 0, def.color, architect, {
+    keepColor: true,
+    emissive: '#aaccee',
+    partRole: 'frame',
+    doubleSided: true,
+  });
+
+  const sashPivot = new THREE.Group();
+  sashPivot.position.set(-w * 0.5 + frame, cy, 0);
+  sashPivot.userData.partRole = 'sash-pivot';
+  group.add(sashPivot);
+  addBox(sashPivot, glassW, glassH, winD * 0.55, glassW * 0.5, 0, 0, def.inner ?? '#dce8f5', architect, {
+    keepColor: true,
+    emissive: '#6688aa',
+    partRole: 'sash',
+    doubleSided: true,
+  });
+  addBox(sashPivot, glassW * 0.86, glassH * 0.86, winD * 0.22, glassW * 0.5, 0, winD * 0.14, '#7ec8ff', architect, {
     keepColor: true,
     isGlass: true,
+    partRole: 'sash',
   });
-  addBox(group, 0.05, glassH, d * 0.28, 0, cy, d * 0.24, def.color, architect, { keepColor: true });
-  addBox(group, glassW, 0.05, d * 0.28, 0, cy, d * 0.24, def.color, architect, { keepColor: true });
-  addBox(group, w + 0.08, 0.08, d * 0.6, 0, sill + 0.04, d * 0.12, def.accent, architect, {
+
+  addBox(group, 0.05, glassH, winD * 0.55, 0, cy, winD * 0.22, def.color, architect, {
     keepColor: true,
+    partRole: 'frame',
+    doubleSided: true,
+  });
+  addBox(group, glassW, 0.05, winD * 0.55, 0, cy, winD * 0.22, def.color, architect, {
+    keepColor: true,
+    partRole: 'frame',
+    doubleSided: true,
+  });
+  addBox(group, glassW * 0.9, glassH * 0.9, 0.025, 0, cy, -winD * 0.48, def.back ?? def.inner, architect, {
+    keepColor: true,
+    emissive: '#5577aa',
+    partRole: 'sash-back',
+    doubleSided: true,
+  });
+  addBox(group, w + 0.1, 0.08, winD * 0.75, 0, sill + 0.04, winD * 0.18, def.accent, architect, {
+    keepColor: true,
+    doubleSided: true,
+    partRole: 'frame',
   });
 }
 
@@ -585,9 +630,10 @@ export function updateFurnitureMaterials(group, mode) {
 }
 
 export function applyDoorOpenState(group, open) {
-  if (!isDoorType(group.userData.furnitureType)) return;
+  if (!isOpenableType(group.userData.furnitureType)) return;
 
   group.userData.doorOpen = !!open;
+  const isWindow = group.userData.furnitureType === 'window';
 
   group.traverse((child) => {
     const role = child.userData.partRole;
@@ -600,14 +646,20 @@ export function applyDoorOpenState(group, open) {
     if (role === 'leaf-right-pivot') {
       child.rotation.y = open ? Math.PI * 0.42 : 0;
     }
+    if (role === 'sash-pivot') {
+      child.rotation.y = open ? Math.PI * 0.38 : 0;
+    }
     if (role === 'passage') {
       child.visible = open;
     }
     if (role === 'handle') {
       child.visible = !open;
     }
-    if (role === 'leaf-back') {
+    if (role === 'leaf-back' || role === 'sash-back') {
       child.visible = !open;
+    }
+    if (isWindow && role === 'sash' && child.isMesh) {
+      child.visible = true;
     }
   });
 }
