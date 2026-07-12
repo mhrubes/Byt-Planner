@@ -9,6 +9,7 @@ import {
   isOpenableType,
   isCarpetType,
   applyDoorOpenState,
+  getFurnitureMountOffset,
 } from './furniture.js';
 
 export class SceneManager {
@@ -510,7 +511,8 @@ export class SceneManager {
       carpetAccent,
     });
     if (!mesh) return null;
-    mesh.position.set(x * GRID_SIZE, 0, z * GRID_SIZE);
+    const yOff = getFurnitureMountOffset(type);
+    mesh.position.set(x * GRID_SIZE, yOff, z * GRID_SIZE);
     mesh.rotation.y = rotation;
     if (isOpenableType(type)) {
       applyDoorOpenState(mesh, doorOpen);
@@ -695,7 +697,8 @@ export class SceneManager {
   updatePlacementGhost(gridX, gridZ) {
     if (!this.placementGhost) return;
     this.placementGhost.visible = true;
-    this.placementGhost.position.set(gridX * GRID_SIZE, 0, gridZ * GRID_SIZE);
+    const yOff = getFurnitureMountOffset(this.placementGhost.userData.furnitureType);
+    this.placementGhost.position.set(gridX * GRID_SIZE, yOff, gridZ * GRID_SIZE);
   }
 
   hidePlacementGhost() {

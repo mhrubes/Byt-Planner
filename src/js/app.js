@@ -12,7 +12,7 @@ import {
   shiftWallsToPlot,
   shiftFurnitureToPlot,
 } from './apartments.js';
-import { FURNITURE_CATALOG, CATALOG_CATEGORIES, isDoorType, isOpenableType, isShelfCabinetType, isCarpetType, CARPET_SHAPES, CARPET_STYLE_DEFAULTS, getCarpetPatternsForType, rebuildCarpetGroup, applyDoorOpenState } from './furniture.js';
+import { FURNITURE_CATALOG, CATALOG_CATEGORIES, isDoorType, isOpenableType, isShelfCabinetType, isCarpetType, CARPET_SHAPES, CARPET_STYLE_DEFAULTS, getCarpetPatternsForType, rebuildCarpetGroup, applyDoorOpenState, getFurnitureMountOffset } from './furniture.js';
 import { SceneManager } from './scene.js';
 import { loadSave, writeSave, clearSave } from './storage.js';
 
@@ -1007,9 +1007,10 @@ export class BytPlannerApp {
       });
       if (hit?.point) {
         const snapped = this.scene.snapFurnitureToGrid(hit.point.x, hit.point.z);
+        const yOff = getFurnitureMountOffset(this.cursorFollowFurniture.userData.furnitureType);
         this.cursorFollowFurniture.position.set(
           snapped.x * GRID_SIZE,
-          0,
+          yOff,
           snapped.z * GRID_SIZE
         );
       }
@@ -1025,9 +1026,10 @@ export class BytPlannerApp {
     if (!hit?.point) return;
 
     const snapped = this.scene.snapFurnitureToGrid(hit.point.x, hit.point.z);
+    const yOff = getFurnitureMountOffset(this.selectedFurniture.userData.furnitureType);
     this.selectedFurniture.position.set(
       snapped.x * GRID_SIZE,
-      0,
+      yOff,
       snapped.z * GRID_SIZE
     );
     if (isDoorType(this.selectedFurniture.userData.furnitureType)) {
@@ -1318,6 +1320,16 @@ export class BytPlannerApp {
       this.doorOpenToggle.textContent = open ? '🔒 Zavřít dvířka' : '🗄️ Otevřít dvířka';
       this.root.querySelector('#door-open-hint').textContent =
         'Otevře lamelová dvířka s ručníky uvnitř · klávesa O';
+    } else if (item.userData.furnitureType === 'kitchen_oven') {
+      this.openableOptionsTitle.textContent = 'Trouba';
+      this.doorOpenToggle.textContent = open ? '🔒 Zavřít dvířka' : '🔥 Otevřít dvířka';
+      this.root.querySelector('#door-open-hint').textContent =
+        'Sklopí dvířka trouby a ukáže plech uvnitř · klávesa O';
+    } else if (item.userData.furnitureType === 'kitchen_dishwasher') {
+      this.openableOptionsTitle.textContent = 'Myčka';
+      this.doorOpenToggle.textContent = open ? '🔒 Zavřít dvířka' : '🫧 Otevřít dvířka';
+      this.root.querySelector('#door-open-hint').textContent =
+        'Sklopí dvířka myčky a ukáže talíře uvnitř · klávesa O';
     } else if (isShelfCabinetType(item.userData.furnitureType)) {
       this.openableOptionsTitle.textContent = 'Skříňka';
       this.doorOpenToggle.textContent = open ? '🔒 Zavřít dvířka' : '🗄️ Otevřít dvířka';

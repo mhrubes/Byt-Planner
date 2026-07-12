@@ -252,6 +252,32 @@ const FURNITURE_ITEMS = {
     accent: '#d0d0d0',
     top: '#e8e8e8',
   },
+  kitchen_oven: {
+    label: 'Trouba',
+    icon: '🔥',
+    size: { w: 0.6, h: 0.9, d: 0.6 },
+    color: '#f0f0f0',
+    accent: '#d0d0d0',
+    top: '#e8e8e8',
+    glass: '#1c1c24',
+  },
+  kitchen_dishwasher: {
+    label: 'Myčka',
+    icon: '🫧',
+    size: { w: 0.6, h: 0.9, d: 0.6 },
+    color: '#f0f0f0',
+    accent: '#e4e4e4',
+    top: '#e8e8e8',
+  },
+  kitchen_hood: {
+    label: 'Digestoř',
+    icon: '💨',
+    size: { w: 0.9, h: 0.75, d: 0.5 },
+    color: '#b8bcc4',
+    accent: '#8a9098',
+    steel: '#c0c4cc',
+    mountOffset: 0.9,
+  },
   dining_table: {
     label: 'Velký jídelní stůl',
     icon: '🍽️',
@@ -404,7 +430,7 @@ export const CATALOG_CATEGORIES = [
     id: 'kitchen',
     label: 'Kuchyně & jídelna',
     icon: '🍳',
-    items: ['kitchen', 'kitchen_unit', 'dining_table_small', 'dining_table_medium', 'dining_table_large', 'chair'],
+    items: ['kitchen', 'kitchen_unit', 'kitchen_oven', 'kitchen_dishwasher', 'kitchen_hood', 'dining_table_small', 'dining_table_medium', 'dining_table_large', 'chair'],
   },
   {
     id: 'office',
@@ -464,8 +490,14 @@ export const OPENABLE_TYPES = new Set([
   'balcony_door',
   'window',
   'bath_shelf',
+  'kitchen_oven',
+  'kitchen_dishwasher',
   ...CABINET_TYPES,
 ]);
+
+export function getFurnitureMountOffset(type) {
+  return FURNITURE_ITEMS[type]?.mountOffset ?? 0;
+}
 
 export function isDoorType(type) {
   return DOOR_TYPES.has(type);
@@ -584,6 +616,15 @@ export function createFurnitureMesh(type, mode = 'preview', {
     case 'kitchen_unit':
       buildKitchenUnit(group, w, h, d, def, isArchitect);
       break;
+    case 'kitchen_oven':
+      buildKitchenOven(group, w, h, d, def, isArchitect);
+      break;
+    case 'kitchen_dishwasher':
+      buildKitchenDishwasher(group, w, h, d, def, isArchitect);
+      break;
+    case 'kitchen_hood':
+      buildKitchenHood(group, w, h, d, def, isArchitect);
+      break;
     case 'lamp':
       buildLampLarge(group, w, h, d, def, isArchitect);
       break;
@@ -659,6 +700,179 @@ function buildKitchenUnit(group, w, h, d, def, architect) {
 
   addBox(group, w, splashH, 0.02, 0, baseH + topH + splashH * 0.5, -d * 0.49, '#fafafa', architect);
   addBox(group, w * 0.12, splashH * 0.35, 0.03, 0, baseH + topH + splashH * 0.65, -d * 0.46, '#c0c0c0', architect);
+}
+
+function addDropDownApplianceDoor(group, doorW, doorH, doorT, hingeY, frontZ, def, architect, {
+  glass = false,
+  glassColor = '#1c1c24',
+  frameColor = '#e8e8e8',
+  pivotRole = 'drop-door-pivot',
+} = {}) {
+  const doorPivot = new THREE.Group();
+  doorPivot.position.set(0, hingeY, frontZ);
+  doorPivot.userData.partRole = pivotRole;
+  group.add(doorPivot);
+
+  addBox(doorPivot, doorW, doorH, doorT, 0, doorH * 0.5, 0, frameColor, architect, {
+    partRole: 'appliance-door',
+    doubleSided: true,
+  });
+
+  if (glass) {
+    addBox(doorPivot, doorW * 0.84, doorH * 0.58, 0.012, 0, doorH * 0.62, doorT * 0.46, glassColor, architect, {
+      partRole: 'appliance-door',
+      isGlass: true,
+      doubleSided: true,
+    });
+    addBox(doorPivot, doorW * 0.78, doorH * 0.5, 0.008, 0, doorH * 0.6, doorT * 0.48, '#0a0a12', architect, {
+      partRole: 'appliance-door',
+      doubleSided: true,
+    });
+  }
+
+  addBox(doorPivot, doorW * 0.42, 0.022, 0.03, 0, doorH * 0.9, doorT * 0.52, '#b0b0b0', architect, {
+    partRole: 'handle',
+    doubleSided: true,
+  });
+}
+
+function buildKitchenOven(group, w, h, d, def, architect) {
+  const baseH = h * 0.7;
+  const topH = h * 0.05;
+  const splashH = h * 0.2;
+  const topColor = def.top ?? '#e8e8e8';
+  const glass = def.glass ?? '#1c1c24';
+  const doorH = baseH * 0.58;
+  const doorBottomY = baseH * 0.08;
+  const doorW = w * 0.9;
+  const doorT = 0.02;
+  const frontZ = d * 0.5 - doorT * 0.35;
+  const cavityH = baseH * 0.5;
+  const cavityBottomY = doorBottomY + 0.03;
+  const cavityCenterY = cavityBottomY + cavityH * 0.5;
+  const cavityDepth = d * 0.4;
+  const cavityBackZ = -d * 0.2;
+
+  addBox(group, w, baseH, d, 0, baseH * 0.5, 0, def.color, architect);
+
+  addBox(group, w * 0.78, cavityH, 0.02, 0, cavityCenterY, cavityBackZ - cavityDepth * 0.5, '#2a2a2a', architect);
+  addBox(group, 0.02, cavityH, cavityDepth, -w * 0.39, cavityCenterY, cavityBackZ, '#333333', architect);
+  addBox(group, 0.02, cavityH, cavityDepth, w * 0.39, cavityCenterY, cavityBackZ, '#333333', architect);
+  addBox(group, w * 0.76, 0.02, cavityDepth, 0, cavityBottomY, cavityBackZ, '#3a3a3a', architect);
+  addBox(group, w * 0.62, 0.012, d * 0.3, 0, cavityBottomY + 0.05, cavityBackZ + cavityDepth * 0.15, '#8a9098', architect, {
+    keepColor: true,
+    emissive: '#4a5058',
+  });
+  addBox(group, w * 0.56, 0.006, d * 0.26, 0, cavityBottomY + 0.062, cavityBackZ + cavityDepth * 0.15, '#b0b8c0', architect);
+
+  addBox(group, w * 0.9, baseH * 0.14, 0.018, 0, baseH * 0.76, d * 0.49, def.accent, architect);
+  addCylinder(group, 0.024, 0.012, '#c0c0c0', architect, { x: -w * 0.26, y: baseH * 0.76, z: d * 0.5 });
+  addCylinder(group, 0.024, 0.012, '#c0c0c0', architect, { x: -w * 0.1, y: baseH * 0.76, z: d * 0.5 });
+  addBox(group, w * 0.16, 0.035, 0.01, w * 0.18, baseH * 0.76, d * 0.5, '#1a1a1a', architect);
+
+  addDropDownApplianceDoor(group, doorW, doorH, doorT, doorBottomY, frontZ, def, architect, {
+    glass: true,
+    glassColor: glass,
+    frameColor: def.color,
+    pivotRole: 'oven-door-pivot',
+  });
+
+  addBox(group, w * 1.03, topH, d * 1.02, 0, baseH + topH * 0.5, 0, topColor, architect);
+  addBox(group, w * 0.9, 0.01, d * 0.82, 0, baseH + topH + 0.006, d * 0.02, '#141414', architect);
+  const burners = [
+    [-w * 0.2, -d * 0.1],
+    [w * 0.2, -d * 0.1],
+    [-w * 0.2, d * 0.12],
+    [w * 0.2, d * 0.12],
+  ];
+  burners.forEach(([bx, bz]) => {
+    addCylinder(group, 0.055, 0.006, '#222222', architect, { x: bx, y: baseH + topH + 0.012, z: bz });
+    addCylinder(group, 0.032, 0.004, '#3a3a3a', architect, { x: bx, y: baseH + topH + 0.015, z: bz });
+  });
+  addBox(group, w, splashH, 0.02, 0, baseH + topH + splashH * 0.5, -d * 0.49, '#fafafa', architect);
+}
+
+function buildKitchenDishwasher(group, w, h, d, def, architect) {
+  const baseH = h * 0.7;
+  const topH = h * 0.05;
+  const splashH = h * 0.2;
+  const topColor = def.top ?? '#e8e8e8';
+  const doorH = baseH * 0.62;
+  const doorBottomY = baseH * 0.06;
+  const doorW = w * 0.92;
+  const doorT = 0.022;
+  const frontZ = d * 0.5 - doorT * 0.35;
+  const cavityH = baseH * 0.52;
+  const cavityBottomY = doorBottomY + 0.04;
+  const cavityCenterY = cavityBottomY + cavityH * 0.5;
+  const cavityDepth = d * 0.38;
+  const cavityBackZ = -d * 0.18;
+
+  addBox(group, w, baseH, d, 0, baseH * 0.5, 0, def.color, architect);
+
+  addBox(group, w * 0.8, cavityH, 0.02, 0, cavityCenterY, cavityBackZ - cavityDepth * 0.5, '#c8d0d8', architect);
+  addBox(group, 0.02, cavityH, cavityDepth, -w * 0.4, cavityCenterY, cavityBackZ, '#b8c0c8', architect);
+  addBox(group, 0.02, cavityH, cavityDepth, w * 0.4, cavityCenterY, cavityBackZ, '#b8c0c8', architect);
+  addBox(group, w * 0.78, 0.02, cavityDepth, 0, cavityBottomY, cavityBackZ, '#a8b0b8', architect);
+
+  for (let row = 0; row < 3; row++) {
+    const rackY = cavityBottomY + 0.08 + row * 0.1;
+    addBox(group, w * 0.72, 0.006, 0.01, 0, rackY, cavityBackZ + cavityDepth * 0.35, '#9098a0', architect);
+    for (let col = 0; col < 2; col++) {
+      const px = (col - 0.5) * w * 0.34;
+      const pz = cavityBackZ + cavityDepth * (0.2 + row * 0.22);
+      addCylinder(group, 0.095, 0.01, ['#eef2f5', '#e4eaef', '#f5f8fa'][row], architect, {
+        x: px,
+        y: rackY + 0.04,
+        z: pz,
+      });
+      addCylinder(group, 0.07, 0.006, '#dce4ea', architect, { x: px, y: rackY + 0.055, z: pz });
+    }
+  }
+
+  addBox(group, w * 0.92, 0.055, 0.024, 0, baseH * 0.77, d * 0.5, '#d8d8d8', architect);
+  addBox(group, 0.035, 0.008, 0.008, w * 0.34, baseH * 0.77, d * 0.505, '#3a8833', architect, {
+    emissive: '#2a6622',
+    keepColor: true,
+  });
+
+  addDropDownApplianceDoor(group, doorW, doorH, doorT, doorBottomY, frontZ, def, architect, {
+    frameColor: def.accent,
+    pivotRole: 'dishwasher-door-pivot',
+  });
+
+  addBox(group, w * 1.03, topH, d * 1.02, 0, baseH + topH * 0.5, 0, topColor, architect);
+  addBox(group, w, splashH, 0.02, 0, baseH + topH + splashH * 0.5, -d * 0.49, '#fafafa', architect);
+}
+
+function buildKitchenHood(group, w, h, d, def, architect) {
+  const steel = def.steel ?? '#c0c4cc';
+  const steelDark = def.accent ?? '#8a9098';
+  const bottomY = h * 0.16;
+  const hoodH = h * 0.44;
+  const chimneyH = h * 0.35;
+  const hoodCY = bottomY + hoodH * 0.42;
+
+  addBox(group, w * 0.34, chimneyH, d * 0.4, 0, bottomY + hoodH + chimneyH * 0.5, -d * 0.08, steelDark, architect);
+  addBox(group, w * 0.26, chimneyH * 0.88, d * 0.34, 0, bottomY + hoodH + chimneyH * 0.5, -d * 0.06, steel, architect);
+  addBox(group, w * 0.9, hoodH * 0.34, d * 0.86, 0, hoodCY, d * 0.05, steel, architect);
+  addBox(group, w * 0.68, hoodH * 0.52, d * 0.7, 0, hoodCY + hoodH * 0.26, -d * 0.02, steel, architect);
+  addBox(group, w * 0.44, hoodH * 0.22, d * 0.48, 0, hoodCY + hoodH * 0.48, -d * 0.04, steelDark, architect);
+  addBox(group, w * 0.86, 0.038, d * 0.8, 0, bottomY, d * 0.08, steelDark, architect);
+  for (let i = -3; i <= 3; i++) {
+    addBox(group, w * 0.78, 0.006, 0.01, i * w * 0.1, bottomY + 0.02, d * 0.47, '#707880', architect);
+  }
+  addBox(group, w * 0.11, 0.022, d * 0.07, -w * 0.24, bottomY - 0.008, d * 0.12, '#fff8e0', architect, {
+    emissive: '#ffd070',
+    keepColor: true,
+  });
+  addBox(group, w * 0.11, 0.022, d * 0.07, w * 0.24, bottomY - 0.008, d * 0.12, '#fff8e0', architect, {
+    emissive: '#ffd070',
+    keepColor: true,
+  });
+  addBox(group, w * 0.16, 0.028, 0.018, 0, hoodCY + hoodH * 0.4, d * 0.4, '#3a3a3a', architect);
+  addCylinder(group, 0.011, 0.007, '#e0e0e0', architect, { x: -0.035, y: hoodCY + hoodH * 0.4, z: d * 0.42 });
+  addCylinder(group, 0.011, 0.007, '#e0e0e0', architect, { x: 0.035, y: hoodCY + hoodH * 0.4, z: d * 0.42 });
 }
 
 function buildKitchenLine(group, w, h, d, def, architect) {
@@ -2477,6 +2691,9 @@ export function applyDoorOpenState(group, open) {
     }
     if (role === 'cabinet-door-right-pivot') {
       child.rotation.y = open ? Math.PI * 0.48 : 0;
+    }
+    if (role === 'drop-door-pivot' || role === 'oven-door-pivot' || role === 'dishwasher-door-pivot') {
+      child.rotation.x = open ? -Math.PI * 0.52 : 0;
     }
     if (role === 'passage') {
       child.visible = open;
