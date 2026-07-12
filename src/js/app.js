@@ -19,6 +19,16 @@ import {
   isOpeningOnWall,
 } from './apartments.js';
 import { FURNITURE_CATALOG, CATALOG_CATEGORIES, isDoorType, isWallGapType, isWindowType, isOpenableType, isShelfCabinetType, isCarpetType, isTvType, usesWallSnap, TV_STYLES, TV_STYLE_DEFAULTS, CARPET_SHAPES, CARPET_STYLE_DEFAULTS, getCarpetPatternsForType, rebuildCarpetGroup, rebuildTvGroup, applyDoorOpenState, getFurnitureMountOffset } from './furniture.js';
+import {
+  assignFurnitureGroup,
+  canGroupFurnitureItems,
+  clearFurnitureGroup,
+  dissolvePartialGroups,
+  getGroupMembers,
+  nextGroupId,
+  snapFurnitureRow,
+  updateGroupOffsets,
+} from './furniture-groups.js';
 import { SceneManager } from './scene.js';
 import { loadSave, writeSave, clearSave } from './storage.js';
 
@@ -32,6 +42,10 @@ export class BytPlannerApp {
     this.wallStart = null;
     this.draggedFurniture = null;
     this.selectedFurniture = null;
+    this.selectedFurnitureItems = new Set();
+    this.dragGroupMembers = null;
+    this.dragStartPositions = null;
+    this.dragAnchorStart = null;
     this.isDragging = false;
     this.isPlacingDrag = false;
     this.placingType = null;
@@ -109,6 +123,16 @@ export class BytPlannerApp {
               <button class="tool-btn" data-tool="wall">🧱 Zeď</button>
               <button class="tool-btn" data-tool="eraser">🗑️ Smazat zeď</button>
             </div>
+          </section>
+
+          <section class="panel-section architect-only hidden" id="group-options">
+            <h3>Skupina nábytku</h3>
+            <p class="save-hint" id="group-options-hint">Vyber více položek a seskup je do řady</p>
+            <div class="save-row">
+              <button type="button" class="save-btn" id="group-create-btn">🔗 Seskupit</button>
+              <button type="button" class="save-btn secondary" id="group-dissolve-btn">✂️ Rozebrat</button>
+            </div>
+            <p class="save-hint">Ctrl+klik přidá do výběru · <kbd>Ctrl+G</kbd> seskupí · <kbd>Ctrl+Shift+G</kbd> rozebere</p>
           </section>
 
           <section class="panel-section architect-only hidden" id="door-options">
@@ -251,6 +275,10 @@ export class BytPlannerApp {
     this.carpetColorAccent = this.root.querySelector('#carpet-color-accent');
     this.tvOptionsPanel = this.root.querySelector('#tv-options');
     this.tvOptionsHint = this.root.querySelector('#tv-options-hint');
+    this.groupOptionsPanel = this.root.querySelector('#group-options');
+    this.groupOptionsHint = this.root.querySelector('#group-options-hint');
+    this.groupCreateBtn = this.root.querySelector('#group-create-btn');
+    this.groupDissolveBtn = this.root.querySelector('#group-dissolve-btn');
     this.renderCarpetShapeButtons();
     this.renderTvStyleButtons();
     this.applyLeftPanelCollapsed(this.leftPanelCollapsed);
@@ -801,6 +829,7 @@ export class BytPlannerApp {
     this.updateDoorOptionsPanel();
     this.updateCarpetOptionsPanel();
     this.updateTvOptionsPanel();
+    this.updateGroupOptionsPanel();
     this.updateWallSelectionUI();
   }
 
@@ -845,8 +874,21 @@ export class BytPlannerApp {
         extra = ' · Klikni na zeď ke smazání';
         statusHint = '→ Klikni na zeď, kterou chceš smazat';
       } else if (this.selectedFurniture) {
-        extra = ` · Vybráno: <span class="selection-label">${this.getSelectedItemLabel()}</span>`;
-        statusHint = '→ Delete smaže · R otočí · Ctrl+C kopíruje';
+        const count = this.selectedFurnitureItems.size;
+        const selectionLabel = count > 1
+          ? `${count} položky`
+          : `<span class="selection-label">${this.getSelectedItemLabel()}</span>`;
+        extra = ` · Vybráno: ${selectionLabel}`;
+        if (this.selectedFurniture.userData.furnitureGroupId) {
+          const groupSize = getGroupMembers(
+            this.scene.furnitureGroup,
+            this.selectedFurniture.userData.furnitureGroupId,
+          ).length;
+          extra += ` · Skupina (${groupSize})`;
+        }
+        statusHint = count > 1
+          ? '→ Ctrl+G seskupí · táhni jako celek po seskupení'
+          : '→ Ctrl+klik více výběrů · Delete smaže · R otočí';
       }
     }
 
@@ -908,8 +950,9 @@ export class BytPlannerApp {
       this.architectHints.innerHTML = `
         <strong>Režim architekta</strong>
         V katalogu vyber položku → na podlaze drž a táhni myší.<br />
-        Vybraný nábytek táhni myší. <kbd>R</kbd> otočí o 45°. <kbd>Del</kbd> smaže.<br />
-        <kbd>Ctrl+C</kbd> kopíruje · <kbd>Ctrl+V</kbd> vloží kopii k přesunu.<br />
+        Vybraný nábytek táhni myší. <kbd>Ctrl</kbd>+klik vybere více kusů.<br />
+        <kbd>Ctrl+G</kbd> seskupí řadu bez mezer · skupinu táhneš jako celek.<br />
+        <kbd>R</kbd> otočí o 45°. <kbd>Del</kbd> smaže. <kbd>Ctrl+C</kbd> / <kbd>Ctrl+V</kbd> kopíruje.<br />
         U dveří: <kbd>O</kbd> otevře/zavře průchod ve zdi.<br />
         Nástroj Zeď: klikni start → konec (libovolný úhel). <kbd>Shift</kbd> = 45°.<br />
         Modrá čára = stávající byt. Mimo ni můžeš stavět dál.
@@ -980,6 +1023,9 @@ export class BytPlannerApp {
     this.doorOpenToggle?.addEventListener('click', () => this.toggleSelectedDoorOpen());
     this.carpetColorMain?.addEventListener('input', () => this.applyCarpetColor('carpetColor', this.carpetColorMain.value));
     this.carpetColorAccent?.addEventListener('input', () => this.applyCarpetColor('carpetAccent', this.carpetColorAccent.value));
+
+    this.groupCreateBtn?.addEventListener('click', () => this.groupSelectedFurniture());
+    this.groupDissolveBtn?.addEventListener('click', () => this.ungroupSelectedFurniture());
 
     window.addEventListener('beforeunload', () => {
       if (this.mode === 'architect') this.saveNow({ auto: true, quiet: true });
@@ -1195,7 +1241,13 @@ export class BytPlannerApp {
       }
 
       if (this.tool === 'select' && hit?.type === 'furniture') {
-        this.selectFurniture(hit.object);
+        const additive = e.ctrlKey || e.metaKey;
+        if (additive) {
+          this.toggleFurnitureSelection(hit.object);
+        } else {
+          this.selectFurniture(hit.object);
+        }
+        this.prepareGroupDrag();
         this.isDragging = true;
         this.scene.controls.enabled = false;
         return;
@@ -1260,19 +1312,32 @@ export class BytPlannerApp {
 
     if (!this.isDragging || !this.selectedFurniture) return;
 
+    const excludeTargets = this.dragGroupMembers?.length
+      ? this.dragGroupMembers
+      : this.selectedFurniture;
+
     const hit = this.scene.raycast(e.clientX, e.clientY, {
       includeGround: true,
-      exclude: this.selectedFurniture,
+      exclude: excludeTargets,
     });
     if (!hit?.point) return;
 
     const snapped = this.scene.snapFurnitureToGrid(hit.point.x, hit.point.z);
+    const newX = snapped.x * GRID_SIZE;
+    const newZ = snapped.z * GRID_SIZE;
+
+    if (this.dragGroupMembers?.length && this.dragAnchorStart && this.dragStartPositions) {
+      const dx = newX - this.dragAnchorStart.x;
+      const dz = newZ - this.dragAnchorStart.z;
+      for (const start of this.dragStartPositions) {
+        const yOff = getFurnitureMountOffset(start.obj.userData.furnitureType);
+        start.obj.position.set(start.x + dx, yOff, start.z + dz);
+      }
+      return;
+    }
+
     const yOff = getFurnitureMountOffset(this.selectedFurniture.userData.furnitureType);
-    this.selectedFurniture.position.set(
-      snapped.x * GRID_SIZE,
-      yOff,
-      snapped.z * GRID_SIZE
-    );
+    this.selectedFurniture.position.set(newX, yOff, newZ);
     if (usesWallSnap(this.selectedFurniture.userData.furnitureType, this.selectedFurniture.userData.tvStyle)) {
       this.snapWallOpeningToWall(this.selectedFurniture);
       if (isWallGapType(this.selectedFurniture.userData.furnitureType)) {
@@ -1314,7 +1379,9 @@ export class BytPlannerApp {
 
     if (wasDragging && this.selectedFurniture) {
       const { furnitureType, tvStyle } = this.selectedFurniture.userData;
-      if (usesWallSnap(furnitureType, tvStyle)) {
+      if (this.dragGroupMembers?.length) {
+        this.syncGroupOffsetsForMembers(this.dragGroupMembers);
+      } else if (usesWallSnap(furnitureType, tvStyle)) {
         this.snapWallOpeningToWall(this.selectedFurniture);
         if (isWallGapType(furnitureType)) {
           this.scene.refreshWallOpenings();
@@ -1323,6 +1390,9 @@ export class BytPlannerApp {
       this.scheduleSave();
     }
 
+    this.dragGroupMembers = null;
+    this.dragStartPositions = null;
+    this.dragAnchorStart = null;
     this.scene.controls.enabled = true;
   }
 
@@ -1402,47 +1472,199 @@ export class BytPlannerApp {
     this.clearSelectionHighlight();
     this.selectedFurniture = obj;
 
-    if (this.mode === 'architect') {
-      if (!obj.userData.selectionRing) {
-        const ringGeo = new THREE.RingGeometry(0.55, 0.65, 32);
-        const ringMat = new THREE.MeshBasicMaterial({
-          color: 0x5b8def,
-          transparent: true,
-          opacity: 0.85,
-          side: THREE.DoubleSide,
-        });
-        const ring = new THREE.Mesh(ringGeo, ringMat);
-        ring.rotation.x = -Math.PI / 2;
-        ring.userData.isSelectionRing = true;
-        obj.add(ring);
-        obj.userData.selectionRing = ring;
+    const groupId = obj.userData.furnitureGroupId;
+    if (groupId) {
+      const members = getGroupMembers(this.scene.furnitureGroup, groupId);
+      this.selectedFurnitureItems = new Set(members);
+      for (const member of members) {
+        this.highlightFurniture(member);
       }
-      const type = obj.userData.furnitureType;
-      const def = FURNITURE_CATALOG[type];
-      const mountOff = getFurnitureMountOffset(type);
-      const dropH = def?.size?.h ?? 1;
-      if (mountOff >= 2.5) {
-        obj.userData.selectionRing.position.y = -dropH + 0.1;
-      } else if (mountOff > 0.2) {
-        obj.userData.selectionRing.position.y = -dropH * 0.45;
-      } else {
-        obj.userData.selectionRing.position.y = 0.03;
-      }
-      obj.userData.selectionRing.visible = true;
-      if (isCarpetType(obj.userData.furnitureType)) {
-        const span = Math.max(obj.userData.sizeW ?? 1, obj.userData.sizeD ?? 1);
-        const scale = span / 1.2;
-        obj.userData.selectionRing.scale.set(scale, scale, 1);
-      } else {
-        obj.userData.selectionRing.scale.set(1, 1, 1);
-      }
+    } else {
+      this.selectedFurnitureItems.add(obj);
+      this.highlightFurniture(obj);
     }
 
     this.updateDoorOptionsPanel();
     this.updateCarpetOptionsPanel();
     this.updateTvOptionsPanel();
+    this.updateGroupOptionsPanel();
     this.updatePreviewOpenablePopover();
     this.updateStatus();
+  }
+
+  toggleFurnitureSelection(obj) {
+    if (this.selectedFurnitureItems.has(obj)) {
+      if (obj.userData.selectionRing) obj.userData.selectionRing.visible = false;
+      this.selectedFurnitureItems.delete(obj);
+      if (this.selectedFurniture === obj) {
+        const remaining = [...this.selectedFurnitureItems];
+        this.selectedFurniture = remaining.length ? remaining[remaining.length - 1] : null;
+      }
+    } else {
+      this.selectedFurnitureItems.add(obj);
+      this.selectedFurniture = obj;
+      this.highlightFurniture(obj);
+    }
+
+    this.updateDoorOptionsPanel();
+    this.updateCarpetOptionsPanel();
+    this.updateTvOptionsPanel();
+    this.updateGroupOptionsPanel();
+    this.updatePreviewOpenablePopover();
+    this.updateStatus();
+  }
+
+  highlightFurniture(obj) {
+    if (this.mode !== 'architect') return;
+
+    if (!obj.userData.selectionRing) {
+      const ringGeo = new THREE.RingGeometry(0.55, 0.65, 32);
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: 0x5b8def,
+        transparent: true,
+        opacity: 0.85,
+        side: THREE.DoubleSide,
+      });
+      const ring = new THREE.Mesh(ringGeo, ringMat);
+      ring.rotation.x = -Math.PI / 2;
+      ring.userData.isSelectionRing = true;
+      obj.add(ring);
+      obj.userData.selectionRing = ring;
+    }
+
+    const type = obj.userData.furnitureType;
+    const def = FURNITURE_CATALOG[type];
+    const mountOff = getFurnitureMountOffset(type);
+    const dropH = def?.size?.h ?? 1;
+    if (mountOff >= 2.5) {
+      obj.userData.selectionRing.position.y = -dropH + 0.1;
+    } else if (mountOff > 0.2) {
+      obj.userData.selectionRing.position.y = -dropH * 0.45;
+    } else {
+      obj.userData.selectionRing.position.y = 0.03;
+    }
+    obj.userData.selectionRing.visible = true;
+    if (isCarpetType(obj.userData.furnitureType)) {
+      const span = Math.max(obj.userData.sizeW ?? 1, obj.userData.sizeD ?? 1);
+      const scale = span / 1.2;
+      obj.userData.selectionRing.scale.set(scale, scale, 1);
+    } else {
+      obj.userData.selectionRing.scale.set(1, 1, 1);
+    }
+  }
+
+  prepareGroupDrag() {
+    const primary = this.selectedFurniture;
+    if (!primary) {
+      this.dragGroupMembers = null;
+      this.dragStartPositions = null;
+      this.dragAnchorStart = null;
+      return;
+    }
+
+    const groupId = primary.userData.furnitureGroupId;
+    this.dragGroupMembers = groupId
+      ? getGroupMembers(this.scene.furnitureGroup, groupId)
+      : [primary];
+
+    this.dragStartPositions = this.dragGroupMembers.map((obj) => ({
+      x: obj.position.x,
+      z: obj.position.z,
+      obj,
+    }));
+    this.dragAnchorStart = {
+      x: primary.position.x,
+      z: primary.position.z,
+    };
+  }
+
+  getItemsForGrouping() {
+    return [...this.selectedFurnitureItems];
+  }
+
+  syncGroupOffsetsForMembers(members) {
+    const groupId = members[0]?.userData.furnitureGroupId;
+    if (!groupId) return;
+    const anchorId = members[0].userData.groupAnchorId;
+    const anchor = members.find((obj) => obj.userData.furnitureId === anchorId) ?? members[0];
+    updateGroupOffsets(members, anchor);
+  }
+
+  groupSelectedFurniture() {
+    if (this.mode !== 'architect') return;
+
+    const items = this.getItemsForGrouping();
+    const check = canGroupFurnitureItems(items);
+    if (!check.ok) {
+      this.flashCopyHint(check.reason);
+      return;
+    }
+
+    dissolvePartialGroups(this.scene.furnitureGroup, items);
+
+    const groupId = nextGroupId();
+    const anchor = assignFurnitureGroup(items, groupId);
+
+    for (const obj of items) {
+      this.highlightFurniture(obj);
+    }
+    this.selectedFurniture = anchor;
+    this.selectedFurnitureItems = new Set(items);
+
+    this.updateGroupOptionsPanel();
+    this.updateStatus();
+    this.scheduleSave();
+    this.flashCopyHint(`Seskupeno ✓ (${items.length} položek)`);
+  }
+
+  ungroupSelectedFurniture() {
+    if (this.mode !== 'architect' || !this.selectedFurniture) return;
+
+    const groupId = this.selectedFurniture.userData.furnitureGroupId;
+    if (!groupId) {
+      this.flashCopyHint('Vybraná položka není ve skupině');
+      return;
+    }
+
+    const members = getGroupMembers(this.scene.furnitureGroup, groupId);
+    clearFurnitureGroup(members);
+    this.updateGroupOptionsPanel();
+    this.updateStatus();
+    this.scheduleSave();
+    this.flashCopyHint('Skupina rozebrána ✓');
+  }
+
+  updateGroupOptionsPanel() {
+    if (!this.groupOptionsPanel) return;
+
+    const count = this.selectedFurnitureItems.size;
+    const inGroup = !!this.selectedFurniture?.userData.furnitureGroupId;
+    const show = this.mode === 'architect' && (count >= 2 || inGroup);
+    this.groupOptionsPanel.classList.toggle('hidden', !show);
+
+    if (!show) return;
+
+    const canGroup = canGroupFurnitureItems(this.getItemsForGrouping());
+    if (this.groupOptionsHint) {
+      if (count >= 2) {
+        this.groupOptionsHint.textContent = canGroup.ok
+          ? `Seskupíš ${count} položky těsně vedle sebe`
+          : canGroup.reason;
+      } else if (inGroup) {
+        const groupSize = getGroupMembers(
+          this.scene.furnitureGroup,
+          this.selectedFurniture.userData.furnitureGroupId,
+        ).length;
+        this.groupOptionsHint.textContent = `Skupina má ${groupSize} položek — táhni jako celek`;
+      }
+    }
+
+    if (this.groupCreateBtn) {
+      this.groupCreateBtn.disabled = !canGroup.ok;
+    }
+    if (this.groupDissolveBtn) {
+      this.groupDissolveBtn.disabled = !inGroup;
+    }
   }
 
   renderTvStyleButtons() {
@@ -1786,13 +2008,15 @@ export class BytPlannerApp {
   }
 
   clearSelectionHighlight() {
-    if (this.selectedFurniture?.userData.selectionRing) {
-      this.selectedFurniture.userData.selectionRing.visible = false;
+    for (const obj of this.selectedFurnitureItems) {
+      if (obj.userData.selectionRing) obj.userData.selectionRing.visible = false;
     }
+    this.selectedFurnitureItems.clear();
     this.selectedFurniture = null;
     this.updateDoorOptionsPanel();
     this.updateCarpetOptionsPanel();
     this.updateTvOptionsPanel();
+    this.updateGroupOptionsPanel();
     this.updateStatus();
   }
 
@@ -1834,6 +2058,8 @@ export class BytPlannerApp {
   removeFurnitureObject(obj) {
     if (!obj) return;
     const wasWallGap = isWallGapType(obj.userData.furnitureType);
+    const groupId = obj.userData.furnitureGroupId;
+
     obj.traverse((c) => {
       if (c.geometry) c.geometry.dispose();
       if (c.material) c.material.dispose();
@@ -1841,10 +2067,22 @@ export class BytPlannerApp {
     this.scene.furnitureGroup.remove(obj);
     if (this.cursorFollowFurniture === obj) this.cursorFollowFurniture = null;
     if (this.selectedFurniture === obj) this.selectedFurniture = null;
+    this.selectedFurnitureItems.delete(obj);
+
+    if (groupId) {
+      const remaining = getGroupMembers(this.scene.furnitureGroup, groupId);
+      if (remaining.length < 2) {
+        clearFurnitureGroup(remaining);
+      } else {
+        this.syncGroupOffsetsForMembers(remaining);
+      }
+    }
+
     if (wasWallGap) this.scene.refreshWallOpenings();
     this.updateDoorOptionsPanel();
     this.updateCarpetOptionsPanel();
     this.updateTvOptionsPanel();
+    this.updateGroupOptionsPanel();
   }
 
   copySelected() {
@@ -1941,7 +2179,11 @@ export class BytPlannerApp {
   deleteSelected() {
     if (!this.selectedFurniture || this.mode !== 'architect') return;
     this.removeFurnitureObject(this.selectedFurniture);
-    this.selectedFurniture = null;
+    if (this.selectedFurnitureItems.size === 0) {
+      this.selectedFurniture = null;
+    } else {
+      this.selectedFurniture = [...this.selectedFurnitureItems].pop();
+    }
     this.updateStatus();
     this.scheduleSave();
   }
@@ -1950,23 +2192,38 @@ export class BytPlannerApp {
     if (!this.selectedFurniture) return;
     if (!this.selectedFurniture.userData.rotatable) return;
 
-    const opening = this.getOpeningState(this.selectedFurniture);
-    const onWall = isOpeningOnWall(opening, this.walls, FURNITURE_CATALOG, GRID_SIZE);
+    const groupId = this.selectedFurniture.userData.furnitureGroupId;
+    const targets = groupId
+      ? getGroupMembers(this.scene.furnitureGroup, groupId)
+      : [this.selectedFurniture];
 
-    const ud = this.selectedFurniture.userData;
-    if (usesWallSnap(ud.furnitureType, ud.tvStyle) && onWall) {
-      const wall = findNearestWallAt(opening.x, opening.z, this.walls);
-      if (wall) {
-        const aligned = snapOpeningRotationToWall(this.selectedFurniture.rotation.y, getWallYaw(wall));
-        this.selectedFurniture.rotation.y = normalizeAngleRad(aligned + Math.PI);
+    for (const furniture of targets) {
+      if (!furniture.userData.rotatable) continue;
+
+      const opening = this.getOpeningState(furniture);
+      const onWall = isOpeningOnWall(opening, this.walls, FURNITURE_CATALOG, GRID_SIZE);
+      const ud = furniture.userData;
+
+      if (usesWallSnap(ud.furnitureType, ud.tvStyle) && onWall) {
+        const wall = findNearestWallAt(opening.x, opening.z, this.walls);
+        if (wall) {
+          const aligned = snapOpeningRotationToWall(furniture.rotation.y, getWallYaw(wall));
+          furniture.rotation.y = normalizeAngleRad(aligned + Math.PI);
+        }
+      } else {
+        furniture.rotation.y += step * FURNITURE_ROTATION_STEP;
       }
-    } else {
-      this.selectedFurniture.rotation.y += step * FURNITURE_ROTATION_STEP;
+
+      if (isWallGapType(ud.furnitureType)) {
+        this.scene.refreshWallOpenings();
+      }
     }
 
-    if (isWallGapType(ud.furnitureType)) {
-      this.scene.refreshWallOpenings();
+    if (groupId && targets.length > 1) {
+      snapFurnitureRow(targets);
+      this.syncGroupOffsetsForMembers(targets);
     }
+
     if (this.mode === 'architect') {
       this.scheduleSave();
     } else {
@@ -1984,6 +2241,16 @@ export class BytPlannerApp {
   onKeyDown(e) {
     const mod = e.ctrlKey || e.metaKey;
 
+    if (mod && e.shiftKey && (e.key === 'g' || e.key === 'G')) {
+      e.preventDefault();
+      this.ungroupSelectedFurniture();
+      return;
+    }
+    if (mod && (e.key === 'g' || e.key === 'G')) {
+      e.preventDefault();
+      this.groupSelectedFurniture();
+      return;
+    }
     if (mod && (e.key === 'c' || e.key === 'C')) {
       e.preventDefault();
       this.copySelected();

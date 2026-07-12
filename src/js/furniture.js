@@ -628,6 +628,7 @@ export function isCarpetType(type) {
 let furnitureIdCounter = 0;
 
 export function createFurnitureMesh(type, mode = 'preview', {
+  furnitureId,
   sizeW,
   sizeD,
   carpetShape,
@@ -645,7 +646,7 @@ export function createFurnitureMesh(type, mode = 'preview', {
   group.userData = {
     isFurniture: true,
     furnitureType: type,
-    furnitureId: `f-${++furnitureIdCounter}`,
+    furnitureId: furnitureId ?? `f-${++furnitureIdCounter}`,
     rotatable: !isCarpetType(type),
     doorOpen: false,
   };
@@ -3167,4 +3168,15 @@ export function applyDoorOpenState(group, open) {
 
 export function resetFurnitureIdCounter() {
   furnitureIdCounter = 0;
+}
+
+export function syncFurnitureIdCounter(ids = []) {
+  let max = furnitureIdCounter;
+  for (const id of ids) {
+    if (typeof id === 'string' && id.startsWith('f-')) {
+      const n = parseInt(id.slice(2), 10);
+      if (!Number.isNaN(n)) max = Math.max(max, n);
+    }
+  }
+  furnitureIdCounter = max;
 }

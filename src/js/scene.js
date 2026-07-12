@@ -13,7 +13,9 @@ import {
   isCarpetType,
   applyDoorOpenState,
   getFurnitureMountOffset,
+  syncFurnitureIdCounter,
 } from './furniture.js';
+import { syncGroupIdCounterFromState } from './furniture-groups.js';
 
 export class SceneManager {
   constructor(container) {
@@ -567,6 +569,7 @@ export class SceneManager {
   }
 
   addFurniture(type, x, z, rotation = 0, {
+    furnitureId,
     doorOpen = false,
     sizeW,
     sizeD,
@@ -575,8 +578,13 @@ export class SceneManager {
     carpetColor,
     carpetAccent,
     tvStyle,
+    furnitureGroupId,
+    groupAnchorId,
+    groupOffsetX,
+    groupOffsetZ,
   } = {}) {
     const mesh = createFurnitureMesh(type, this.mode, {
+      furnitureId,
       sizeW,
       sizeD,
       carpetShape,
@@ -589,6 +597,12 @@ export class SceneManager {
     const yOff = getFurnitureMountOffset(type);
     mesh.position.set(x * GRID_SIZE, yOff, z * GRID_SIZE);
     mesh.rotation.y = rotation;
+    if (furnitureGroupId) {
+      mesh.userData.furnitureGroupId = furnitureGroupId;
+      mesh.userData.groupAnchorId = groupAnchorId;
+      mesh.userData.groupOffsetX = groupOffsetX ?? 0;
+      mesh.userData.groupOffsetZ = groupOffsetZ ?? 0;
+    }
     if (isOpenableType(type)) {
       applyDoorOpenState(mesh, doorOpen);
     }
@@ -605,10 +619,17 @@ export class SceneManager {
     return this.furnitureGroup.children.map((f) => {
       const item = {
         type: f.userData.furnitureType,
+        furnitureId: f.userData.furnitureId,
         x: f.position.x / GRID_SIZE,
         z: f.position.z / GRID_SIZE,
         rotation: f.rotation.y,
       };
+      if (f.userData.furnitureGroupId) {
+        item.furnitureGroupId = f.userData.furnitureGroupId;
+        item.groupAnchorId = f.userData.groupAnchorId;
+        item.groupOffsetX = f.userData.groupOffsetX ?? 0;
+        item.groupOffsetZ = f.userData.groupOffsetZ ?? 0;
+      }
       if (isOpenableType(item.type)) {
         item.doorOpen = !!f.userData.doorOpen;
       }
@@ -629,9 +650,13 @@ export class SceneManager {
 
   loadFurnitureFromState(items) {
     this.clearFurniture();
+    syncFurnitureIdCounter(items.map((item) => item.furnitureId).filter(Boolean));
+    syncGroupIdCounterFromState(items);
+
     for (const item of items) {
       if (!item?.type) continue;
       this.addFurniture(item.type, item.x, item.z, item.rotation ?? 0, {
+        furnitureId: item.furnitureId,
         doorOpen: item.doorOpen ?? false,
         sizeW: item.sizeW,
         sizeD: item.sizeD,
@@ -640,6 +665,10 @@ export class SceneManager {
         carpetColor: item.carpetColor,
         carpetAccent: item.carpetAccent,
         tvStyle: item.tvStyle,
+        furnitureGroupId: item.furnitureGroupId,
+        groupAnchorId: item.groupAnchorId,
+        groupOffsetX: item.groupOffsetX,
+        groupOffsetZ: item.groupOffsetZ,
       });
     }
     this.refreshWallOpenings();
@@ -663,11 +692,13 @@ export class SceneManager {
     const targets = this.getIntersectables();
     if (includeGround && this.raycastPlane) targets.unshift(this.raycastPlane);
 
+    const excludes = Array.isArray(exclude) ? exclude : (exclude ? [exclude] : []);
+
     const hits = this.raycaster.intersectObjects(targets, true).filter((h) => {
-      if (!exclude) return true;
+      if (excludes.length === 0) return true;
       let obj = h.object;
       while (obj) {
-        if (obj === exclude) return false;
+        if (excludes.some((ex) => ex === obj)) return false;
         obj = obj.parent;
       }
       return true;
