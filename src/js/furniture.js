@@ -54,6 +54,16 @@ const FURNITURE_ITEMS = {
     color: '#1a1a2e',
     accent: '#2d2d44',
   },
+  fireplace: {
+    label: 'Krb',
+    icon: '🔥',
+    size: { w: 1.35, h: 1.4, d: 0.42 },
+    color: '#c4bcb4',
+    accent: '#7a7268',
+    mantel: '#5c4033',
+    fire: '#e85a20',
+    inner: '#1a1008',
+  },
   table: {
     label: 'Konferenční stůl',
     icon: '☕',
@@ -373,7 +383,7 @@ export const CATALOG_CATEGORIES = [
     label: 'Obývací pokoj',
     icon: '🛋️',
     items: [
-      'sofa', 'tv', 'table', 'bookshelf',
+      'sofa', 'tv', 'fireplace', 'table', 'bookshelf',
       'shelf_small', 'shelf_small_cabinet', 'shelf_medium', 'shelf_medium_cabinet', 'shelf_large', 'shelf_large_cabinet',
       'plant', 'plant_medium', 'plant_large', 'lamp_small', 'lamp_medium', 'lamp', 'carpet',
     ],
@@ -541,6 +551,9 @@ export function createFurnitureMesh(type, mode = 'preview', {
     case 'tv':
       addBox(group, w, h, d, 0, h * 0.5 + 0.5, 0, def.color, isArchitect);
       addBox(group, w * 0.6, 0.05, d * 2, 0, 0.5, 0, '#333333', isArchitect);
+      break;
+    case 'fireplace':
+      buildFireplace(group, w, h, d, def, isArchitect);
       break;
     case 'bookshelf':
       buildBookshelf(group, w, h, d, def, isArchitect);
@@ -1415,6 +1428,71 @@ function buildWindow(group, w, h, d, def, architect) {
     doubleSided: true,
     partRole: 'frame',
   });
+}
+
+function buildFireplace(group, w, h, d, def, architect) {
+  const stone = def.color ?? '#c4bcb4';
+  const stoneDark = def.accent ?? '#7a7268';
+  const mantel = def.mantel ?? '#5c4033';
+  const inner = def.inner ?? '#1a1008';
+  const fireColor = def.fire ?? '#e85a20';
+
+  const hearthH = h * 0.045;
+  const bodyBase = hearthH;
+  const bodyH = h * 0.68;
+  const bodyCY = bodyBase + bodyH / 2;
+  const openingW = w * 0.52;
+  const openingH = h * 0.36;
+  const openingCY = bodyBase + h * 0.28;
+  const pillarW = (w - openingW) / 2 - 0.02;
+
+  addBox(group, w * 1.08, hearthH, d * 0.92, 0, hearthH / 2, d * 0.04, stoneDark, architect);
+  addBox(group, w, 0.018, d * 0.88, 0, hearthH + 0.009, d * 0.03, stone, architect);
+
+  addBox(group, pillarW, bodyH, d, -w / 2 + pillarW / 2, bodyCY, 0, stone, architect);
+  addBox(group, pillarW, bodyH, d, w / 2 - pillarW / 2, bodyCY, 0, stone, architect);
+  addBox(group, openingW + pillarW * 1.6, bodyH * 0.22, d, 0, bodyBase + bodyH - bodyH * 0.11, 0, stone, architect);
+
+  const hoodH = h * 0.14;
+  const hoodY = bodyBase + bodyH + hoodH / 2 - h * 0.02;
+  addBox(group, w * 0.88, hoodH, d * 0.85, 0, hoodY, -d * 0.04, stoneDark, architect);
+  addBox(group, w * 0.7, hoodH * 0.55, d * 0.55, 0, hoodY + hoodH * 0.18, -d * 0.12, stone, architect);
+
+  const mantelH = h * 0.05;
+  const mantelY = bodyBase + bodyH + h * 0.025;
+  addBox(group, w * 1.12, mantelH, d * 0.55, 0, mantelY, d * 0.12, mantel, architect);
+  addBox(group, w * 1.05, mantelH * 0.35, d * 0.08, 0, mantelY + mantelH * 0.55, d * 0.32, stoneDark, architect);
+
+  addBox(group, openingW * 0.92, openingH * 0.92, d * 0.55, 0, openingCY, -d * 0.08, inner, architect);
+  addBox(group, openingW * 0.88, 0.025, d * 0.5, 0, openingCY - openingH * 0.42, -d * 0.06, '#2a1810', architect);
+
+  addBox(group, openingW * 0.9, openingH * 0.9, 0.025, 0, openingCY, d * 0.18, '#3a3830', architect, { keepColor: !architect });
+  addBox(group, 0.025, openingH * 0.88, 0.025, -openingW / 2 + 0.012, openingCY, d * 0.19, '#5a5850', architect, { keepColor: !architect });
+  addBox(group, 0.025, openingH * 0.88, 0.025, openingW / 2 - 0.012, openingCY, d * 0.19, '#5a5850', architect, { keepColor: !architect });
+  addBox(group, openingW * 0.9, 0.025, 0.025, 0, openingCY + openingH * 0.42, d * 0.19, '#5a5850', architect, { keepColor: !architect });
+
+  const logY = openingCY - openingH * 0.12;
+  addBox(group, openingW * 0.35, 0.05, 0.06, -openingW * 0.1, logY, d * 0.02, '#3d2818', architect);
+  addBox(group, openingW * 0.3, 0.045, 0.055, openingW * 0.12, logY + 0.02, d * 0.04, '#4a3020', architect);
+  addBox(group, openingW * 0.28, 0.04, 0.05, -openingW * 0.15, logY + 0.04, -d * 0.02, '#352218', architect);
+
+  addBox(group, openingW * 0.55, openingH * 0.35, d * 0.25, 0, openingCY + openingH * 0.05, -d * 0.02, fireColor, architect, {
+    emissive: fireColor,
+    keepColor: true,
+  });
+  addBox(group, openingW * 0.3, openingH * 0.2, d * 0.18, -openingW * 0.12, openingCY - openingH * 0.05, 0, '#ff8833', architect, {
+    emissive: '#ff6622',
+    keepColor: true,
+  });
+  addBox(group, openingW * 0.25, openingH * 0.18, d * 0.15, openingW * 0.1, openingCY - openingH * 0.02, d * 0.02, '#ffaa44', architect, {
+    emissive: '#ff7722',
+    keepColor: true,
+  });
+
+  addBox(group, w * 0.08, h * 0.1, d * 0.06, -w * 0.38, mantelY + mantelH + h * 0.055, d * 0.14, '#8b7355', architect);
+  addBox(group, w * 0.06, h * 0.08, d * 0.05, w * 0.35, mantelY + mantelH + h * 0.045, d * 0.12, '#6b5344', architect);
+  addCylinder(group, 0.035, h * 0.07, '#2a5a2a', architect, { x: w * 0.36, y: mantelY + mantelH + h * 0.08, z: d * 0.1 });
+  addSphere(group, 0.05, mantelY + mantelH + h * 0.13, '#3a7a3a', architect, { x: w * 0.36, z: d * 0.1 });
 }
 
 function buildRadiator(group, w, h, d, def, architect) {
