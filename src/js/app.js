@@ -1981,8 +1981,8 @@ export class BytPlannerApp {
     if (isWindowType(type)) return 'Vyklopí křídlo okna · klávesa O';
     if (type === 'wardrobe') return 'Ukáže nebo skryje oblečení ve skříni · klávesa O';
     if (type === 'bath_shelf') return 'Otevře lamelová dvířka s ručníky uvnitř · klávesa O';
-    if (type === 'kitchen_oven') return 'Sklopí dvířka trouby a ukáže plech uvnitř · klávesa O';
-    if (type === 'kitchen_dishwasher') return 'Sklopí dvířka myčky a ukáže talíře uvnitř · klávesa O';
+    if (type === 'kitchen_oven') return 'Sklopí dvířka trouby a ukáže černou dutinu s roštem a kuřetem · klávesa O';
+    if (type === 'kitchen_dishwasher') return 'Sklopí dvířka myčky a ukáže tmavě stříbrnou dutinu s koši a nádobím · klávesa O';
     if (type === 'kitchen_fridge') return 'Otevře dvířka lednice a ukáže police s jídlem · klávesa O';
     if (isShelfCabinetType(type)) return 'Otevře nebo zavře dvířka skříňky · klávesa O';
     if (isDoorType(type)) return 'Přepne otevřený průchod ve zdi · klávesa O';

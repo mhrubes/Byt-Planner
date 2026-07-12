@@ -864,49 +864,102 @@ function addDropDownApplianceDoor(group, doorW, doorH, doorT, hingeY, frontZ, de
   });
 }
 
+function addOvenRack(group, rackW, rackD, y, z, architect) {
+  const interior = { keepColor: true, partRole: 'oven-interior' };
+  const barT = 0.005;
+  const railCount = 6;
+
+  for (let i = 0; i < railCount; i++) {
+    const t = railCount > 1 ? i / (railCount - 1) : 0.5;
+    const px = -rackW * 0.5 + t * rackW;
+    addBox(group, barT, barT, rackD * 0.9, px, y, z, '#7a8088', architect, interior);
+  }
+
+  const rungs = 4;
+  for (let j = 0; j < rungs; j++) {
+    const t = rungs > 1 ? j / (rungs - 1) : 0.5;
+    const pz = -rackD * 0.45 + t * rackD * 0.9;
+    addBox(group, rackW * 0.96, barT, barT, 0, y, z + pz, '#8a9098', architect, interior);
+  }
+
+  addBox(group, 0.008, 0.028, rackD * 0.86, -rackW * 0.47, y - 0.012, z, '#6a7078', architect, interior);
+  addBox(group, 0.008, 0.028, rackD * 0.86, rackW * 0.47, y - 0.012, z, '#6a7078', architect, interior);
+}
+
+function addOvenChicken(group, x, y, z, s, architect) {
+  const interior = { keepColor: true, partRole: 'oven-interior' };
+
+  addBox(group, s * 0.34, 0.01, s * 0.28, x, y - s * 0.04, z, '#4a4a4a', architect, interior);
+  addSphere(group, s * 0.13, y + s * 0.05, '#c07028', architect, { x, z: z + s * 0.02, keepColor: true });
+  addBox(group, s * 0.11, s * 0.09, s * 0.14, x - s * 0.02, y + s * 0.1, z + s * 0.05, '#d08838', architect, interior);
+  addBox(group, s * 0.05, s * 0.07, s * 0.05, x - s * 0.1, y - s * 0.01, z - s * 0.08, '#9a6020', architect, interior);
+  addBox(group, s * 0.05, s * 0.06, s * 0.05, x + s * 0.08, y, z - s * 0.07, '#9a6020', architect, interior);
+  addBox(group, s * 0.05, s * 0.04, s * 0.08, x + s * 0.1, y + s * 0.11, z + s * 0.02, '#e0a838', architect, interior);
+}
+
 function buildKitchenOven(group, w, h, d, def, architect) {
   const baseH = h * 0.7;
   const topH = h * 0.05;
   const splashH = h * 0.2;
   const topColor = def.top ?? '#e8e8e8';
   const glass = def.glass ?? '#1c1c24';
+  const body = def.color ?? '#f0f0f0';
+  const side = 0.04;
+  const innerW = w - side * 2;
   const doorH = baseH * 0.58;
   const doorBottomY = baseH * 0.08;
   const doorW = w * 0.9;
   const doorT = 0.02;
   const frontZ = d * 0.5 - doorT * 0.35;
-  const cavityH = baseH * 0.5;
-  const cavityBottomY = doorBottomY + 0.03;
-  const cavityCenterY = cavityBottomY + cavityH * 0.5;
-  const cavityDepth = d * 0.4;
-  const cavityBackZ = -d * 0.2;
+  const cavityH = baseH * 0.48;
+  const cavityBottomY = doorBottomY + 0.04;
+  const cavityTopY = cavityBottomY + cavityH;
+  const cavityDepth = d * 0.42;
+  const cavityZ = -d * 0.5 + side + cavityDepth * 0.5 + 0.01;
+  const shell = { keepColor: true, partRole: 'oven-shell' };
+  const cavity = { keepColor: true, partRole: 'oven-interior' };
+  const cavityBlack = '#141414';
+  const cavityDark = '#0a0a0a';
 
-  addBox(group, w, baseH, d, 0, baseH * 0.5, 0, def.color, architect);
+  addBox(group, w, side, d, 0, side * 0.5, 0, body, architect, shell);
+  addBox(group, w, side, d, 0, baseH - side * 0.5, 0, body, architect, shell);
+  addBox(group, side, baseH - side * 2, d, -w * 0.5 + side * 0.5, baseH * 0.5, 0, body, architect, shell);
+  addBox(group, side, baseH - side * 2, d, w * 0.5 - side * 0.5, baseH * 0.5, 0, body, architect, shell);
+  addBox(group, innerW, baseH - side * 2, side, 0, baseH * 0.5, -d * 0.5 + side * 0.5, body, architect, shell);
 
-  addBox(group, w * 0.78, cavityH, 0.02, 0, cavityCenterY, cavityBackZ - cavityDepth * 0.5, '#2a2a2a', architect);
-  addBox(group, 0.02, cavityH, cavityDepth, -w * 0.39, cavityCenterY, cavityBackZ, '#333333', architect);
-  addBox(group, 0.02, cavityH, cavityDepth, w * 0.39, cavityCenterY, cavityBackZ, '#333333', architect);
-  addBox(group, w * 0.76, 0.02, cavityDepth, 0, cavityBottomY, cavityBackZ, '#3a3a3a', architect);
-  addBox(group, w * 0.62, 0.012, d * 0.3, 0, cavityBottomY + 0.05, cavityBackZ + cavityDepth * 0.15, '#8a9098', architect, {
+  addBox(group, innerW, cavityH, 0.02, 0, cavityBottomY + cavityH * 0.5, -d * 0.5 + side + 0.01, cavityBlack, architect, cavity);
+  addBox(group, 0.02, cavityH, cavityDepth, -innerW * 0.5 + 0.01, cavityBottomY + cavityH * 0.5, cavityZ, cavityDark, architect, cavity);
+  addBox(group, 0.02, cavityH, cavityDepth, innerW * 0.5 - 0.01, cavityBottomY + cavityH * 0.5, cavityZ, cavityDark, architect, cavity);
+  addBox(group, innerW, 0.02, cavityDepth, 0, cavityBottomY + 0.01, cavityZ, cavityBlack, architect, cavity);
+  addBox(group, innerW, 0.02, cavityDepth, 0, cavityTopY - 0.01, cavityZ, cavityBlack, architect, cavity);
+
+  addBox(group, innerW * 0.7, 0.012, 0.018, 0, cavityTopY - 0.04, cavityZ + cavityDepth * 0.22, '#505050', architect, cavity);
+  addBox(group, innerW * 0.62, 0.008, 0.012, 0, cavityTopY - 0.05, cavityZ + cavityDepth * 0.22, '#ff8840', architect, {
     keepColor: true,
-    emissive: '#4a5058',
+    emissive: '#cc5520',
+    partRole: 'oven-interior',
   });
-  addBox(group, w * 0.56, 0.006, d * 0.26, 0, cavityBottomY + 0.062, cavityBackZ + cavityDepth * 0.15, '#b0b8c0', architect);
 
-  addBox(group, w * 0.9, baseH * 0.14, 0.018, 0, baseH * 0.76, d * 0.49, def.accent, architect);
+  const rackY = cavityBottomY + cavityH * 0.42;
+  const rackW = innerW * 0.72;
+  const rackD = cavityDepth * 0.62;
+  addOvenRack(group, rackW, rackD, rackY, cavityZ + cavityDepth * 0.12, architect);
+  addOvenChicken(group, 0, rackY + 0.04, cavityZ + cavityDepth * 0.1, w * 0.95, architect);
+
+  addBox(group, w * 0.9, baseH * 0.14, 0.018, 0, baseH * 0.76, d * 0.49, def.accent, architect, shell);
   addCylinder(group, 0.024, 0.012, '#c0c0c0', architect, { x: -w * 0.26, y: baseH * 0.76, z: d * 0.5 });
   addCylinder(group, 0.024, 0.012, '#c0c0c0', architect, { x: -w * 0.1, y: baseH * 0.76, z: d * 0.5 });
-  addBox(group, w * 0.16, 0.035, 0.01, w * 0.18, baseH * 0.76, d * 0.5, '#1a1a1a', architect);
+  addBox(group, w * 0.16, 0.035, 0.01, w * 0.18, baseH * 0.76, d * 0.5, '#1a1a1a', architect, shell);
 
   addDropDownApplianceDoor(group, doorW, doorH, doorT, doorBottomY, frontZ, def, architect, {
     glass: true,
     glassColor: glass,
-    frameColor: def.color,
+    frameColor: body,
     pivotRole: 'oven-door-pivot',
   });
 
-  addBox(group, w * 1.03, topH, d * 1.02, 0, baseH + topH * 0.5, 0, topColor, architect);
-  addBox(group, w * 0.9, 0.01, d * 0.82, 0, baseH + topH + 0.006, d * 0.02, '#141414', architect);
+  addBox(group, w * 1.03, topH, d * 1.02, 0, baseH + topH * 0.5, 0, topColor, architect, shell);
+  addBox(group, w * 0.9, 0.01, d * 0.82, 0, baseH + topH + 0.006, d * 0.02, '#141414', architect, shell);
   const burners = [
     [-w * 0.2, -d * 0.1],
     [w * 0.2, -d * 0.1],
@@ -917,7 +970,65 @@ function buildKitchenOven(group, w, h, d, def, architect) {
     addCylinder(group, 0.055, 0.006, '#222222', architect, { x: bx, y: baseH + topH + 0.012, z: bz });
     addCylinder(group, 0.032, 0.004, '#3a3a3a', architect, { x: bx, y: baseH + topH + 0.015, z: bz });
   });
-  addBox(group, w, splashH, 0.02, 0, baseH + topH + splashH * 0.5, -d * 0.49, '#fafafa', architect);
+  addBox(group, w, splashH, 0.02, 0, baseH + topH + splashH * 0.5, -d * 0.49, '#fafafa', architect, shell);
+}
+
+function addDishwasherRack(group, rackW, rackD, y, z, architect) {
+  const interior = { keepColor: true, partRole: 'dishwasher-interior' };
+  const barT = 0.005;
+  const railCount = 7;
+
+  for (let i = 0; i < railCount; i++) {
+    const t = railCount > 1 ? i / (railCount - 1) : 0.5;
+    const px = -rackW * 0.5 + t * rackW;
+    addBox(group, barT, barT, rackD * 0.88, px, y, z, '#8a929a', architect, interior);
+  }
+
+  const rungs = 5;
+  for (let j = 0; j < rungs; j++) {
+    const t = rungs > 1 ? j / (rungs - 1) : 0.5;
+    const pz = -rackD * 0.44 + t * rackD * 0.88;
+    addBox(group, rackW * 0.96, barT, barT, 0, y, z + pz, '#9aa2aa', architect, interior);
+  }
+
+  addBox(group, 0.01, 0.03, rackD * 0.84, -rackW * 0.48, y - 0.013, z, '#7a828a', architect, interior);
+  addBox(group, 0.01, 0.03, rackD * 0.84, rackW * 0.48, y - 0.013, z, '#7a828a', architect, interior);
+}
+
+function addDishwasherPlate(group, x, y, z, radius, architect, color = '#eef2f6') {
+  addCylinder(group, radius, 0.009, color, architect, {
+    x, y, z, keepColor: true, partRole: 'dishwasher-interior',
+  });
+}
+
+function addDishwasherBowl(group, x, y, z, radius, architect) {
+  const interior = { keepColor: true, partRole: 'dishwasher-interior' };
+  addCylinder(group, radius, 0.045, '#dce4ec', architect, { x, y: y + 0.02, z, ...interior });
+  addCylinder(group, radius * 0.82, 0.006, '#c8d4de', architect, { x, y: y + 0.04, z, ...interior });
+}
+
+function addDishwasherCup(group, x, y, z, s, architect) {
+  const interior = { keepColor: true, partRole: 'dishwasher-interior' };
+  addCylinder(group, s * 0.045, s * 0.1, '#f0f4f8', architect, { x, y: y + s * 0.05, z, ...interior });
+  addCylinder(group, s * 0.05, 0.006, '#e0e8f0', architect, { x, y: y + s * 0.1, z, ...interior });
+}
+
+function addDishwasherPot(group, x, y, z, s, architect) {
+  const interior = { keepColor: true, partRole: 'dishwasher-interior' };
+  addCylinder(group, s * 0.1, s * 0.08, '#b8c0c8', architect, { x, y: y + s * 0.04, z, ...interior });
+  addBox(group, s * 0.14, 0.012, s * 0.02, x, y + s * 0.085, z - s * 0.08, '#9aa4ae', architect, interior);
+}
+
+function addDishwasherSprayArm(group, y, z, w, architect) {
+  const interior = { keepColor: true, partRole: 'dishwasher-interior' };
+  addCylinder(group, 0.028, 0.018, '#7a828a', architect, { y, z, ...interior });
+  addBox(group, w * 0.38, 0.01, 0.018, 0, y + 0.01, z, '#8a929a', architect, interior);
+  addBox(group, 0.018, 0.01, w * 0.22, 0, y + 0.01, z, '#8a929a', architect, interior);
+  for (const sx of [-1, 1]) {
+    addCylinder(group, 0.008, 0.012, '#6a727a', architect, {
+      x: sx * w * 0.17, y: y + 0.012, z, keepColor: true,
+    });
+  }
 }
 
 function buildKitchenDishwasher(group, w, h, d, def, architect) {
@@ -925,52 +1036,85 @@ function buildKitchenDishwasher(group, w, h, d, def, architect) {
   const topH = h * 0.05;
   const splashH = h * 0.2;
   const topColor = def.top ?? '#e8e8e8';
+  const body = def.color ?? '#f0f0f0';
+  const side = 0.04;
+  const innerW = w - side * 2;
   const doorH = baseH * 0.62;
   const doorBottomY = baseH * 0.06;
   const doorW = w * 0.92;
   const doorT = 0.022;
   const frontZ = d * 0.5 - doorT * 0.35;
-  const cavityH = baseH * 0.52;
+  const cavityH = baseH * 0.54;
   const cavityBottomY = doorBottomY + 0.04;
-  const cavityCenterY = cavityBottomY + cavityH * 0.5;
-  const cavityDepth = d * 0.38;
-  const cavityBackZ = -d * 0.18;
+  const cavityTopY = cavityBottomY + cavityH;
+  const cavityDepth = d * 0.4;
+  const cavityZ = -d * 0.5 + side + cavityDepth * 0.5 + 0.01;
+  const shell = { keepColor: true, partRole: 'dishwasher-shell' };
+  const cavity = { keepColor: true, partRole: 'dishwasher-interior' };
+  const silverBack = '#5a6472';
+  const silverSide = '#4a5462';
+  const silverFloor = '#6a7482';
+  const silverTop = '#525c6a';
 
-  addBox(group, w, baseH, d, 0, baseH * 0.5, 0, def.color, architect);
+  addBox(group, w, side, d, 0, side * 0.5, 0, body, architect, shell);
+  addBox(group, w, side, d, 0, baseH - side * 0.5, 0, body, architect, shell);
+  addBox(group, side, baseH - side * 2, d, -w * 0.5 + side * 0.5, baseH * 0.5, 0, body, architect, shell);
+  addBox(group, side, baseH - side * 2, d, w * 0.5 - side * 0.5, baseH * 0.5, 0, body, architect, shell);
+  addBox(group, innerW, baseH - side * 2, side, 0, baseH * 0.5, -d * 0.5 + side * 0.5, body, architect, shell);
 
-  addBox(group, w * 0.8, cavityH, 0.02, 0, cavityCenterY, cavityBackZ - cavityDepth * 0.5, '#c8d0d8', architect);
-  addBox(group, 0.02, cavityH, cavityDepth, -w * 0.4, cavityCenterY, cavityBackZ, '#b8c0c8', architect);
-  addBox(group, 0.02, cavityH, cavityDepth, w * 0.4, cavityCenterY, cavityBackZ, '#b8c0c8', architect);
-  addBox(group, w * 0.78, 0.02, cavityDepth, 0, cavityBottomY, cavityBackZ, '#a8b0b8', architect);
+  addBox(group, innerW, cavityH, 0.02, 0, cavityBottomY + cavityH * 0.5, -d * 0.5 + side + 0.01, silverBack, architect, cavity);
+  addBox(group, 0.02, cavityH, cavityDepth, -innerW * 0.5 + 0.01, cavityBottomY + cavityH * 0.5, cavityZ, silverSide, architect, cavity);
+  addBox(group, 0.02, cavityH, cavityDepth, innerW * 0.5 - 0.01, cavityBottomY + cavityH * 0.5, cavityZ, silverSide, architect, cavity);
+  addBox(group, innerW, 0.02, cavityDepth, 0, cavityBottomY + 0.01, cavityZ, silverFloor, architect, cavity);
+  addBox(group, innerW, 0.02, cavityDepth, 0, cavityTopY - 0.01, cavityZ, silverTop, architect, cavity);
 
-  for (let row = 0; row < 3; row++) {
-    const rackY = cavityBottomY + 0.08 + row * 0.1;
-    addBox(group, w * 0.72, 0.006, 0.01, 0, rackY, cavityBackZ + cavityDepth * 0.35, '#9098a0', architect);
-    for (let col = 0; col < 2; col++) {
-      const px = (col - 0.5) * w * 0.34;
-      const pz = cavityBackZ + cavityDepth * (0.2 + row * 0.22);
-      addCylinder(group, 0.095, 0.01, ['#eef2f5', '#e4eaef', '#f5f8fa'][row], architect, {
-        x: px,
-        y: rackY + 0.04,
-        z: pz,
-      });
-      addCylinder(group, 0.07, 0.006, '#dce4ea', architect, { x: px, y: rackY + 0.055, z: pz });
+  addDishwasherSprayArm(group, cavityBottomY + 0.05, cavityZ + cavityDepth * 0.08, innerW, architect);
+
+  const rackW = innerW * 0.76;
+  const rackD = cavityDepth * 0.58;
+  const rackZ = cavityZ + cavityDepth * 0.14;
+  const rackLevels = [
+    cavityBottomY + cavityH * 0.22,
+    cavityBottomY + cavityH * 0.48,
+    cavityBottomY + cavityH * 0.74,
+  ];
+
+  rackLevels.forEach((rackY, row) => {
+    addDishwasherRack(group, rackW, rackD, rackY, rackZ, architect);
+
+    if (row === 0) {
+      addDishwasherPot(group, -innerW * 0.18, rackY + 0.02, rackZ - rackD * 0.1, w * 0.9, architect);
+      addDishwasherPlate(group, innerW * 0.12, rackY + 0.02, rackZ + rackD * 0.12, w * 0.2, architect, '#e4eaef');
+      addDishwasherPlate(group, -innerW * 0.02, rackY + 0.02, rackZ + rackD * 0.22, w * 0.18, architect);
     }
-  }
+    if (row === 1) {
+      addDishwasherPlate(group, -innerW * 0.2, rackY + 0.02, rackZ, w * 0.17, architect);
+      addDishwasherBowl(group, innerW * 0.04, rackY + 0.02, rackZ + rackD * 0.08, w * 0.1, architect);
+      addDishwasherBowl(group, innerW * 0.2, rackY + 0.02, rackZ - rackD * 0.06, w * 0.09, architect, '#d0dae4');
+      addDishwasherPlate(group, -innerW * 0.04, rackY + 0.02, rackZ + rackD * 0.2, w * 0.15, architect, '#f0f4f8');
+    }
+    if (row === 2) {
+      addDishwasherCup(group, -innerW * 0.18, rackY + 0.02, rackZ, w * 0.85, architect);
+      addDishwasherCup(group, -innerW * 0.04, rackY + 0.02, rackZ + rackD * 0.1, w * 0.8, architect);
+      addDishwasherCup(group, innerW * 0.12, rackY + 0.02, rackZ - rackD * 0.04, w * 0.82, architect);
+      addBox(group, w * 0.04, 0.07, 0.012, innerW * 0.26, rackY + 0.05, rackZ + rackD * 0.18, '#c0c8d0', architect, cavity);
+    }
+  });
 
-  addBox(group, w * 0.92, 0.055, 0.024, 0, baseH * 0.77, d * 0.5, '#d8d8d8', architect);
+  addBox(group, w * 0.92, 0.055, 0.024, 0, baseH * 0.77, d * 0.5, '#d8d8d8', architect, shell);
   addBox(group, 0.035, 0.008, 0.008, w * 0.34, baseH * 0.77, d * 0.505, '#3a8833', architect, {
     emissive: '#2a6622',
     keepColor: true,
+    partRole: 'dishwasher-shell',
   });
 
   addDropDownApplianceDoor(group, doorW, doorH, doorT, doorBottomY, frontZ, def, architect, {
-    frameColor: def.accent,
+    frameColor: def.accent ?? body,
     pivotRole: 'dishwasher-door-pivot',
   });
 
-  addBox(group, w * 1.03, topH, d * 1.02, 0, baseH + topH * 0.5, 0, topColor, architect);
-  addBox(group, w, splashH, 0.02, 0, baseH + topH + splashH * 0.5, -d * 0.49, '#fafafa', architect);
+  addBox(group, w * 1.03, topH, d * 1.02, 0, baseH + topH * 0.5, 0, topColor, architect, shell);
+  addBox(group, w, splashH, 0.02, 0, baseH + topH + splashH * 0.5, -d * 0.49, '#fafafa', architect, shell);
 }
 
 function addFridgeFoodBox(group, x, y, z, bw, bh, bd, color, architect) {
