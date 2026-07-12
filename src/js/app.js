@@ -122,6 +122,17 @@ export class BytPlannerApp {
 
           <section class="panel-section architect-only catalog-section">
             <h3>Katalog — vyber a táhni do plánu</h3>
+            <label class="catalog-search">
+              <span class="catalog-search-icon" aria-hidden="true">🔍</span>
+              <input
+                type="search"
+                id="catalog-search"
+                class="catalog-search-input"
+                placeholder="Hledat nábytek, dveře…"
+                autocomplete="off"
+                spellcheck="false"
+              />
+            </label>
             <div class="catalog-categories" id="furniture-catalog"></div>
           </section>
 
@@ -531,8 +542,103 @@ export class BytPlannerApp {
     });
   }
 
-  renderCatalog() {
+  normalizeCatalogSearch(text) {
+    return String(text)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/\p{M}/gu, '');
+  }
+
+  createCatalogItem(type, def, { categories = [] } = {}) {
+    const el = document.createElement('div');
+    el.className = 'furniture-item' + (categories.length ? ' furniture-item--grouped' : '');
+    el.dataset.type = type;
+
+    const categoryHtml = categories.length
+      ? `<div class="furniture-item-categories">${categories
+          .map((category) => `<span class="furniture-item-category">${category.icon} ${category.label}</span>`)
+          .join('')}</div>`
+      : '';
+
+    el.title = categories.length
+      ? `${def.label} · ${categories.map((category) => category.label).join(', ')}`
+      : def.label;
+
+    el.innerHTML = `
+      <div class="furniture-icon">${def.icon}</div>
+      <span class="furniture-item-label">${def.label}</span>
+      ${categoryHtml}
+    `;
+    return el;
+  }
+
+  groupCatalogSearchMatches(matches) {
+    const grouped = new Map();
+
+    for (const match of matches) {
+      if (!grouped.has(match.type)) {
+        grouped.set(match.type, { type: match.type, def: match.def, categoryIds: new Set() });
+      }
+      grouped.get(match.type).categoryIds.add(match.category.id);
+    }
+
+    return [...grouped.values()].map((entry) => ({
+      type: entry.type,
+      def: entry.def,
+      categories: CATALOG_CATEGORIES.filter((category) => entry.categoryIds.has(category.id)),
+    }));
+  }
+
+  getCatalogSearchMatches(query) {
+    const q = this.normalizeCatalogSearch(query.trim());
+    if (!q) return null;
+
+    const results = [];
+    for (const category of CATALOG_CATEGORIES) {
+      for (const type of category.items) {
+        const def = FURNITURE_CATALOG[type];
+        if (!def) continue;
+
+        const haystack = this.normalizeCatalogSearch(`${def.label} ${category.label}`);
+        if (haystack.includes(q)) {
+          results.push({ type, def, category });
+        }
+      }
+    }
+    return results;
+  }
+
+  renderCatalog(searchQuery = '') {
     const container = this.root.querySelector('#furniture-catalog');
+    if (!container) return;
+
+    container.innerHTML = '';
+    const matches = this.getCatalogSearchMatches(searchQuery);
+
+    if (matches) {
+      if (matches.length === 0) {
+        const empty = document.createElement('p');
+        empty.className = 'catalog-search-empty';
+        empty.textContent = `Žádný objekt pro „${searchQuery.trim()}“`;
+        container.appendChild(empty);
+        return;
+      }
+
+      const grouped = this.groupCatalogSearchMatches(matches);
+
+      const header = document.createElement('p');
+      header.className = 'catalog-search-meta';
+      header.textContent = `${grouped.length} ${grouped.length === 1 ? 'výsledek' : grouped.length < 5 ? 'výsledky' : 'výsledků'}`;
+      container.appendChild(header);
+
+      const list = document.createElement('div');
+      list.className = 'furniture-list catalog-search-list';
+      for (const { type, def, categories } of grouped) {
+        list.appendChild(this.createCatalogItem(type, def, { categories }));
+      }
+      container.appendChild(list);
+      return;
+    }
 
     for (const category of CATALOG_CATEGORIES) {
       const details = document.createElement('details');
@@ -550,17 +656,22 @@ export class BytPlannerApp {
       for (const type of category.items) {
         const def = FURNITURE_CATALOG[type];
         if (!def) continue;
-
-        const el = document.createElement('div');
-        el.className = 'furniture-item';
-        el.dataset.type = type;
-        el.title = def.label;
-        el.innerHTML = `<div class="furniture-icon">${def.icon}</div><span>${def.label}</span>`;
-        list.appendChild(el);
+        list.appendChild(this.createCatalogItem(type, def));
       }
 
       details.appendChild(list);
       container.appendChild(details);
+    }
+  }
+
+  applyCatalogSearch(query) {
+    this.catalogSearchQuery = query;
+    this.renderCatalog(query);
+
+    if (this.placingType) {
+      this.root.querySelectorAll('.furniture-item').forEach((item) => {
+        item.classList.toggle('placing', item.dataset.type === this.placingType);
+      });
     }
   }
 
@@ -774,11 +885,16 @@ export class BytPlannerApp {
       btn.addEventListener('click', () => this.scene.setCameraView(btn.dataset.view));
     });
 
-    this.root.querySelectorAll('.furniture-item').forEach((el) => {
-      el.addEventListener('click', () => {
-        if (this.mode !== 'architect') return;
-        this.startPlacing(el.dataset.type, el);
-      });
+    this.catalogSearchInput = this.root.querySelector('#catalog-search');
+    this.catalogSearchInput?.addEventListener('input', (e) => {
+      this.applyCatalogSearch(e.target.value);
+    });
+
+    this.root.querySelector('#furniture-catalog')?.addEventListener('click', (e) => {
+      const el = e.target.closest('.furniture-item');
+      if (!el) return;
+      if (this.mode !== 'architect') return;
+      this.startPlacing(el.dataset.type, el);
     });
 
     const canvasEl = () => this.scene.renderer.domElement;
