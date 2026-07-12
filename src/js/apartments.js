@@ -212,3 +212,86 @@ export function snapWallEndpoint(start, end, { snap45 = false } = {}) {
 export function cloneWalls(walls) {
   return walls.map((w) => ({ ...w }));
 }
+
+function projectT(px, pz, x1, z1, x2, z2) {
+  const dx = x2 - x1;
+  const dz = z2 - z1;
+  const len2 = dx * dx + dz * dz;
+  if (len2 < 1e-6) return 0;
+  return ((px - x1) * dx + (pz - z1) * dz) / len2;
+}
+
+function distPointToSegment(px, pz, x1, z1, x2, z2) {
+  const t = Math.max(0, Math.min(1, projectT(px, pz, x1, z1, x2, z2)));
+  const cx = x1 + (x2 - x1) * t;
+  const cz = z1 + (z2 - z1) * t;
+  return Math.hypot(px - cx, pz - cz);
+}
+
+function wallFromMeters(x1, z1, x2, z2, gridSize) {
+  return {
+    x1: x1 / gridSize,
+    z1: z1 / gridSize,
+    x2: x2 / gridSize,
+    z2: z2 / gridSize,
+  };
+}
+
+function splitWallByOpening(wall, ox1, oz1, ox2, oz2, gridSize) {
+  const x1 = wall.x1 * gridSize;
+  const z1 = wall.z1 * gridSize;
+  const x2 = wall.x2 * gridSize;
+  const z2 = wall.z2 * gridSize;
+  const mx = (ox1 + ox2) / 2;
+  const mz = (oz1 + oz2) / 2;
+
+  if (distPointToSegment(mx, mz, x1, z1, x2, z2) > 0.5) return [wall];
+
+  const t1 = projectT(ox1, oz1, x1, z1, x2, z2);
+  const t2 = projectT(ox2, oz2, x1, z1, x2, z2);
+  const ta = Math.max(0, Math.min(t1, t2));
+  const tb = Math.min(1, Math.max(t1, t2));
+  if (tb - ta < 0.03) return [wall];
+
+  const dx = x2 - x1;
+  const dz = z2 - z1;
+  const pieces = [];
+
+  if (ta > 0.02) {
+    pieces.push(wallFromMeters(x1, z1, x1 + dx * ta, z1 + dz * ta, gridSize));
+  }
+  if (tb < 0.98) {
+    pieces.push(wallFromMeters(x1 + dx * tb, z1 + dz * tb, x2, z2, gridSize));
+  }
+
+  return pieces;
+}
+
+/** Vyřízne z otevřených dveří mezeru ve zdi */
+export function applyOpenDoorGaps(walls, openDoors, catalog, gridSize = GRID_SIZE) {
+  let result = walls.map((w) => ({ ...w }));
+
+  for (const door of openDoors) {
+    const def = catalog[door.type];
+    if (!def) continue;
+
+    const hw = def.size.w / 2;
+    const px = door.x * gridSize;
+    const pz = door.z * gridSize;
+    const r = door.rotation ?? 0;
+    const ux = Math.cos(r);
+    const uz = -Math.sin(r);
+    const ox1 = px - ux * hw;
+    const oz1 = pz - uz * hw;
+    const ox2 = px + ux * hw;
+    const oz2 = pz + uz * hw;
+
+    const next = [];
+    for (const wall of result) {
+      next.push(...splitWallByOpening(wall, ox1, oz1, ox2, oz2, gridSize));
+    }
+    result = next;
+  }
+
+  return result;
+}

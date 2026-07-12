@@ -10,7 +10,7 @@ import {
   shiftWallsToPlot,
   shiftFurnitureToPlot,
 } from './apartments.js';
-import { FURNITURE_CATALOG, CATALOG_CATEGORIES } from './furniture.js';
+import { FURNITURE_CATALOG, CATALOG_CATEGORIES, isDoorType, applyDoorOpenState } from './furniture.js';
 import { SceneManager } from './scene.js';
 import { loadSave, writeSave, clearSave } from './storage.js';
 
@@ -87,6 +87,12 @@ export class BytPlannerApp {
               <button class="tool-btn" data-tool="wall">🧱 Zeď</button>
               <button class="tool-btn" data-tool="eraser">🗑️ Smazat zeď</button>
             </div>
+          </section>
+
+          <section class="panel-section architect-only hidden" id="door-options">
+            <h3>Dveře</h3>
+            <button type="button" class="save-btn" id="door-open-toggle">🚪 Otevřít průchod</button>
+            <p class="save-hint" id="door-open-hint">Přepne otevřený průchod ve zdi · klávesa <kbd>O</kbd></p>
           </section>
 
           <section class="panel-section architect-only catalog-section">
@@ -167,6 +173,8 @@ export class BytPlannerApp {
     this.saveHint = this.root.querySelector('#save-hint');
     this.leftPanelShell = this.root.querySelector('#left-panel-shell');
     this.leftPanelToggle = this.root.querySelector('#left-panel-toggle');
+    this.doorOptionsPanel = this.root.querySelector('#door-options');
+    this.doorOpenToggle = this.root.querySelector('#door-open-toggle');
     this.applyLeftPanelCollapsed(this.leftPanelCollapsed);
 
     const aptBtns = this.root.querySelector('#apartment-btns');
@@ -455,6 +463,7 @@ export class BytPlannerApp {
     this.scene.controls.enabled = true;
     this.updateStatus();
     this.updateSaveHintDefault();
+    this.updateDoorOptionsPanel();
   }
 
   setTool(tool) {
@@ -531,6 +540,7 @@ export class BytPlannerApp {
         V katalogu vyber položku → na podlaze drž a táhni myší.<br />
         Vybraný nábytek táhni myší. <kbd>R</kbd> otočí. <kbd>Del</kbd> smaže.<br />
         <kbd>Ctrl+C</kbd> kopíruje · <kbd>Ctrl+V</kbd> vloží kopii k přesunu.<br />
+        U dveří: <kbd>O</kbd> otevře/zavře průchod ve zdi.<br />
         Nástroj Zeď: klikni start → konec (libovolný úhel). <kbd>Shift</kbd> = 45°.<br />
         Modrá čára = stávající byt. Mimo ni můžeš stavět dál.
       `;
@@ -578,6 +588,7 @@ export class BytPlannerApp {
     this.root.querySelector('#clear-save-btn')?.addEventListener('click', () => this.clearAllSave());
     this.root.querySelector('#reset-btn')?.addEventListener('click', () => this.resetCurrentApartment());
     this.leftPanelToggle?.addEventListener('click', () => this.toggleLeftPanel());
+    this.doorOpenToggle?.addEventListener('click', () => this.toggleSelectedDoorOpen());
 
     window.addEventListener('beforeunload', () => {
       if (this.mode === 'architect') this.saveNow({ auto: true, quiet: true });
@@ -723,6 +734,9 @@ export class BytPlannerApp {
       0,
       snapped.z * GRID_SIZE
     );
+    if (isDoorType(this.selectedFurniture.userData.furnitureType) && this.selectedFurniture.userData.doorOpen) {
+      this.scene.refreshWallOpenings();
+    }
   }
 
   onPointerUp(e) {
@@ -745,6 +759,10 @@ export class BytPlannerApp {
     }
 
     this.isDragging = false;
+    if (this.selectedFurniture && isDoorType(this.selectedFurniture.userData.furnitureType) && this.selectedFurniture.userData.doorOpen) {
+      this.scene.refreshWallOpenings();
+      this.scheduleSave();
+    }
     this.scene.controls.enabled = true;
   }
 
@@ -830,6 +848,31 @@ export class BytPlannerApp {
       obj.userData.selectionRing = ring;
     }
     obj.userData.selectionRing.visible = true;
+    this.updateDoorOptionsPanel();
+  }
+
+  updateDoorOptionsPanel() {
+    const door = this.selectedFurniture;
+    const isDoor = door && isDoorType(door.userData.furnitureType);
+
+    this.doorOptionsPanel?.classList.toggle('hidden', !isDoor || this.mode !== 'architect');
+
+    if (!isDoor || !this.doorOpenToggle) return;
+
+    const open = !!door.userData.doorOpen;
+    this.doorOpenToggle.textContent = open ? '🔒 Zavřít průchod' : '🚪 Otevřít průchod';
+    this.doorOpenToggle.classList.toggle('active', open);
+  }
+
+  toggleSelectedDoorOpen() {
+    if (!this.selectedFurniture || this.mode !== 'architect') return;
+    if (!isDoorType(this.selectedFurniture.userData.furnitureType)) return;
+
+    const next = !this.selectedFurniture.userData.doorOpen;
+    applyDoorOpenState(this.selectedFurniture, next);
+    this.scene.refreshWallOpenings();
+    this.updateDoorOptionsPanel();
+    this.scheduleSave();
   }
 
   clearSelectionHighlight() {
@@ -837,6 +880,7 @@ export class BytPlannerApp {
       this.selectedFurniture.userData.selectionRing.visible = false;
     }
     this.selectedFurniture = null;
+    this.updateDoorOptionsPanel();
   }
 
   clearSelection() {
@@ -845,6 +889,7 @@ export class BytPlannerApp {
 
   removeFurnitureObject(obj) {
     if (!obj) return;
+    const wasOpenDoor = isDoorType(obj.userData.furnitureType) && obj.userData.doorOpen;
     obj.traverse((c) => {
       if (c.geometry) c.geometry.dispose();
       if (c.material) c.material.dispose();
@@ -852,6 +897,8 @@ export class BytPlannerApp {
     this.scene.furnitureGroup.remove(obj);
     if (this.cursorFollowFurniture === obj) this.cursorFollowFurniture = null;
     if (this.selectedFurniture === obj) this.selectedFurniture = null;
+    if (wasOpenDoor) this.scene.refreshWallOpenings();
+    this.updateDoorOptionsPanel();
   }
 
   copySelected() {
@@ -860,6 +907,7 @@ export class BytPlannerApp {
     this.furnitureClipboard = {
       type: this.selectedFurniture.userData.furnitureType,
       rotation: this.selectedFurniture.rotation.y,
+      doorOpen: this.selectedFurniture.userData.doorOpen ?? false,
     };
     this.flashCopyHint('Zkopírováno ✓');
   }
@@ -885,7 +933,8 @@ export class BytPlannerApp {
       this.furnitureClipboard.type,
       x,
       z,
-      this.furnitureClipboard.rotation
+      this.furnitureClipboard.rotation,
+      { doorOpen: this.furnitureClipboard.doorOpen ?? false }
     );
     if (!furn) return;
 
@@ -934,6 +983,9 @@ export class BytPlannerApp {
   rotateSelected() {
     if (!this.selectedFurniture || this.mode !== 'architect') return;
     this.selectedFurniture.rotation.y += Math.PI / 2;
+    if (isDoorType(this.selectedFurniture.userData.furnitureType) && this.selectedFurniture.userData.doorOpen) {
+      this.scene.refreshWallOpenings();
+    }
     this.scheduleSave();
   }
 
@@ -956,6 +1008,9 @@ export class BytPlannerApp {
     }
     if (e.key === 'r' || e.key === 'R') {
       this.rotateSelected();
+    }
+    if (e.key === 'o' || e.key === 'O') {
+      this.toggleSelectedDoorOpen();
     }
     if (e.key === 'Escape') {
       if (this.cursorFollowFurniture) {

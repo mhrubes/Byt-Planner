@@ -191,6 +191,12 @@ export const CATALOG_CATEGORIES = [
 /** Plochý katalog pro zpětnou kompatibilitu */
 export const FURNITURE_CATALOG = { ...FURNITURE_ITEMS };
 
+export const DOOR_TYPES = new Set(['door', 'balcony_door']);
+
+export function isDoorType(type) {
+  return DOOR_TYPES.has(type);
+}
+
 let furnitureIdCounter = 0;
 
 export function createFurnitureMesh(type, mode = 'preview') {
@@ -203,6 +209,7 @@ export function createFurnitureMesh(type, mode = 'preview') {
     furnitureType: type,
     furnitureId: `f-${++furnitureIdCounter}`,
     rotatable: true,
+    doorOpen: false,
   };
 
   const { w, h, d } = def.size;
@@ -286,18 +293,96 @@ function buildDoor(group, w, h, d, def, architect) {
   addBox(group, w + 0.04, h + 0.04, d * 0.45, 0, h * 0.5, 0, def.accent, architect, {
     keepColor: true,
     emissive: '#2a1810',
+    partRole: 'frame',
   });
-  addBox(group, leafW, leafH, d * 0.55, 0, h * 0.5, d * 0.18, def.color, architect, {
+
+  const leafPivot = new THREE.Group();
+  leafPivot.position.set(-w * 0.5 + frame, h * 0.5, d * 0.18);
+  leafPivot.userData.partRole = 'leaf-pivot';
+  group.add(leafPivot);
+
+  addBox(leafPivot, leafW, leafH, d * 0.55, leafW * 0.5, 0, 0, def.color, architect, {
     keepColor: true,
     emissive: '#6b3a12',
+    partRole: 'leaf',
   });
-  addBox(group, leafW * 0.12, leafH * 0.55, 0.025, -leafW * 0.08, h * 0.52, d * 0.42, '#5a3820', architect, {
+  addBox(leafPivot, leafW * 0.12, leafH * 0.55, 0.025, leafW * 0.92, 0, d * 0.24, '#5a3820', architect, {
     keepColor: true,
+    partRole: 'leaf',
   });
   addBox(group, 0.05, 0.14, 0.06, w * 0.38, h * 0.52, d * 0.38, '#e6b422', architect, {
     keepColor: true,
     emissive: '#806010',
+    partRole: 'handle',
   });
+
+  addPassageMarker(group, w, architect);
+}
+
+function addPassageMarker(group, width, architect) {
+  const geo = new THREE.PlaneGeometry(width * 0.9, width * 0.55);
+  const mat = makeMaterial('#4ade80', architect, { keepColor: true });
+  mat.transparent = true;
+  mat.opacity = architect ? 0.55 : 0.4;
+  mat.side = THREE.DoubleSide;
+  const plane = new THREE.Mesh(geo, mat);
+  plane.rotation.x = -Math.PI / 2;
+  plane.position.set(0, 0.025, 0.18);
+  plane.visible = false;
+  plane.userData.partRole = 'passage';
+  plane.userData.isFurniturePart = true;
+  plane.userData.partColor = '#4ade80';
+  plane.userData.keepColor = true;
+  group.add(plane);
+}
+
+function buildBalconyDoor(group, w, h, d, def, architect) {
+  const frame = 0.07;
+  const innerH = h - frame * 2;
+  const panelW = (w - frame * 3) / 2;
+
+  addBox(group, w + 0.04, h + 0.04, d * 0.45, 0, h * 0.5, 0, def.accent, architect, {
+    keepColor: true,
+    emissive: '#0d4a35',
+    partRole: 'frame',
+  });
+
+  const leftPivot = new THREE.Group();
+  leftPivot.position.set(-w * 0.5 + frame, h * 0.5, d * 0.2);
+  leftPivot.userData.partRole = 'leaf-left-pivot';
+  group.add(leftPivot);
+  addBox(leftPivot, panelW, innerH, d * 0.5, panelW * 0.5, 0, 0, def.color, architect, {
+    keepColor: true,
+    emissive: '#334455',
+    partRole: 'leaf',
+  });
+
+  const rightPivot = new THREE.Group();
+  rightPivot.position.set(w * 0.5 - frame, h * 0.5, d * 0.2);
+  rightPivot.userData.partRole = 'leaf-right-pivot';
+  group.add(rightPivot);
+  addBox(rightPivot, panelW, innerH, d * 0.5, -panelW * 0.5, 0, 0, def.color, architect, {
+    keepColor: true,
+    emissive: '#334455',
+    partRole: 'leaf',
+  });
+  addBox(rightPivot, panelW * 0.75, innerH * 0.58, d * 0.22, -panelW * 0.38, innerH * 0.12, d * 0.08, '#7ec8ff', architect, {
+    keepColor: true,
+    isGlass: true,
+    partRole: 'leaf',
+  });
+
+  addBox(group, 0.05, innerH, d * 0.28, 0, h * 0.5, d * 0.24, def.accent, architect, {
+    keepColor: true,
+    partRole: 'frame',
+  });
+  addBox(group, 0.05, 0.12, 0.05, w * 0.42, h * 0.55, d * 0.35, '#e6b422', architect, {
+    keepColor: true,
+    emissive: '#806010',
+    partRole: 'handle',
+  });
+
+  addPassageMarker(group, w, architect);
 }
 
 function buildWindow(group, w, h, d, def, architect) {
@@ -319,34 +404,6 @@ function buildWindow(group, w, h, d, def, architect) {
   addBox(group, glassW, 0.05, d * 0.28, 0, cy, d * 0.24, def.color, architect, { keepColor: true });
   addBox(group, w + 0.08, 0.08, d * 0.6, 0, sill + 0.04, d * 0.12, def.accent, architect, {
     keepColor: true,
-  });
-}
-
-function buildBalconyDoor(group, w, h, d, def, architect) {
-  const frame = 0.07;
-  const innerH = h - frame * 2;
-  const panelW = (w - frame * 3) / 2;
-
-  addBox(group, w + 0.04, h + 0.04, d * 0.45, 0, h * 0.5, 0, def.accent, architect, {
-    keepColor: true,
-    emissive: '#0d4a35',
-  });
-  addBox(group, panelW, innerH, d * 0.5, -panelW * 0.5 - frame * 0.5, h * 0.5, d * 0.2, def.color, architect, {
-    keepColor: true,
-    emissive: '#334455',
-  });
-  addBox(group, panelW, innerH, d * 0.5, panelW * 0.5 + frame * 0.5, h * 0.5, d * 0.2, def.color, architect, {
-    keepColor: true,
-    emissive: '#334455',
-  });
-  addBox(group, panelW * 0.75, innerH * 0.58, d * 0.22, panelW * 0.5 + frame * 0.5, h * 0.62, d * 0.28, '#7ec8ff', architect, {
-    keepColor: true,
-    isGlass: true,
-  });
-  addBox(group, 0.05, innerH, d * 0.28, 0, h * 0.5, d * 0.24, def.accent, architect, { keepColor: true });
-  addBox(group, 0.05, 0.12, 0.05, w * 0.42, h * 0.55, d * 0.35, '#e6b422', architect, {
-    keepColor: true,
-    emissive: '#806010',
   });
 }
 
@@ -434,6 +491,7 @@ function addBox(parent, w, h, d, x, y, z, color, architect, opts = {}) {
   mesh.userData.isGlass = opts.isGlass ?? false;
   mesh.userData.emissive = opts.emissive ?? null;
   mesh.userData.keepColor = opts.keepColor ?? false;
+  mesh.userData.partRole = opts.partRole ?? null;
   parent.add(mesh);
 }
 
@@ -484,6 +542,31 @@ export function updateFurnitureMaterials(group, mode) {
     });
     child.castShadow = !architect || child.userData.keepColor;
     child.receiveShadow = !architect || child.userData.keepColor;
+  });
+}
+
+export function applyDoorOpenState(group, open) {
+  if (!isDoorType(group.userData.furnitureType)) return;
+
+  group.userData.doorOpen = !!open;
+
+  group.traverse((child) => {
+    const role = child.userData.partRole;
+    if (role === 'leaf-pivot') {
+      child.rotation.y = open ? Math.PI * 0.45 : 0;
+    }
+    if (role === 'leaf-left-pivot') {
+      child.rotation.y = open ? -Math.PI * 0.42 : 0;
+    }
+    if (role === 'leaf-right-pivot') {
+      child.rotation.y = open ? Math.PI * 0.42 : 0;
+    }
+    if (role === 'passage') {
+      child.visible = open;
+    }
+    if (role === 'handle') {
+      child.visible = !open;
+    }
   });
 }
 

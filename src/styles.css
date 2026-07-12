@@ -286,6 +286,13 @@ body,
   color: #fecaca;
 }
 
+.save-btn.active,
+#door-open-toggle.active {
+  border-color: var(--preview);
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--preview);
+}
+
 .save-hint {
   margin-top: 8px;
   font-size: 11px;

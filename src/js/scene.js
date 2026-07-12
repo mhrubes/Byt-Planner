@@ -1,7 +1,13 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { GRID_SIZE, WALL_HEIGHT, WALL_THICKNESS } from './apartments.js';
-import { createFurnitureMesh, updateFurnitureMaterials, FURNITURE_CATALOG } from './furniture.js';
+import { GRID_SIZE, WALL_HEIGHT, WALL_THICKNESS, applyOpenDoorGaps } from './apartments.js';
+import {
+  createFurnitureMesh,
+  updateFurnitureMaterials,
+  FURNITURE_CATALOG,
+  isDoorType,
+  applyDoorOpenState,
+} from './furniture.js';
 
 export class SceneManager {
   constructor(container) {
@@ -306,10 +312,30 @@ export class SceneManager {
 
     const isPreview = this.mode === 'preview';
 
-    for (const w of this.walls) {
+    const openDoors = this.furnitureGroup.children
+      .filter((f) => f.userData.doorOpen && isDoorType(f.userData.furnitureType))
+      .map((f) => ({
+        type: f.userData.furnitureType,
+        x: f.position.x / GRID_SIZE,
+        z: f.position.z / GRID_SIZE,
+        rotation: f.rotation.y,
+      }));
+
+    const wallsToRender = applyOpenDoorGaps(
+      this.walls,
+      openDoors,
+      FURNITURE_CATALOG,
+      GRID_SIZE
+    );
+
+    for (const w of wallsToRender) {
       const mesh = this.createWallMesh(w, isPreview);
       if (mesh) this.wallsGroup.add(mesh);
     }
+  }
+
+  refreshWallOpenings() {
+    this.rebuildWalls();
   }
 
   createWallMesh(w, isPreview) {
@@ -357,12 +383,16 @@ export class SceneManager {
     }
   }
 
-  addFurniture(type, x, z, rotation = 0) {
+  addFurniture(type, x, z, rotation = 0, { doorOpen = false } = {}) {
     const mesh = createFurnitureMesh(type, this.mode);
     if (!mesh) return null;
     mesh.position.set(x * GRID_SIZE, 0, z * GRID_SIZE);
     mesh.rotation.y = rotation;
+    if (isDoorType(type)) {
+      applyDoorOpenState(mesh, doorOpen);
+    }
     this.furnitureGroup.add(mesh);
+    if (doorOpen && isDoorType(type)) this.refreshWallOpenings();
     return mesh;
   }
 
@@ -371,20 +401,29 @@ export class SceneManager {
   }
 
   getFurnitureState() {
-    return this.furnitureGroup.children.map((f) => ({
-      type: f.userData.furnitureType,
-      x: f.position.x / GRID_SIZE,
-      z: f.position.z / GRID_SIZE,
-      rotation: f.rotation.y,
-    }));
+    return this.furnitureGroup.children.map((f) => {
+      const item = {
+        type: f.userData.furnitureType,
+        x: f.position.x / GRID_SIZE,
+        z: f.position.z / GRID_SIZE,
+        rotation: f.rotation.y,
+      };
+      if (isDoorType(item.type)) {
+        item.doorOpen = !!f.userData.doorOpen;
+      }
+      return item;
+    });
   }
 
   loadFurnitureFromState(items) {
     this.clearFurniture();
     for (const item of items) {
       if (!item?.type) continue;
-      this.addFurniture(item.type, item.x, item.z, item.rotation ?? 0);
+      this.addFurniture(item.type, item.x, item.z, item.rotation ?? 0, {
+        doorOpen: item.doorOpen ?? false,
+      });
     }
+    this.refreshWallOpenings();
   }
 
   getIntersectables() {
