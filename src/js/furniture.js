@@ -228,13 +228,43 @@ const FURNITURE_ITEMS = {
     size: { w: 2.0, h: 0.9, d: 0.6 },
     color: '#f0f0f0',
     accent: '#d0d0d0',
+    top: '#e8e8e8',
+  },
+  kitchen_unit: {
+    label: 'Kuchyňský modul',
+    icon: '🧊',
+    size: { w: 1.0, h: 0.9, d: 0.6 },
+    color: '#f0f0f0',
+    accent: '#d0d0d0',
+    top: '#e8e8e8',
   },
   dining_table: {
-    label: 'Jídelní stůl',
+    label: 'Velký jídelní stůl',
     icon: '🍽️',
     size: { w: 1.6, h: 0.75, d: 0.9 },
     color: '#8b6914',
     accent: '#a07818',
+  },
+  dining_table_small: {
+    label: 'Malý jídelní stůl',
+    icon: '🥄',
+    size: { w: 0.9, h: 0.72, d: 0.9 },
+    color: '#9a7a28',
+    accent: '#b8922a',
+  },
+  dining_table_medium: {
+    label: 'Střední jídelní stůl',
+    icon: '🍴',
+    size: { w: 1.2, h: 0.74, d: 0.85 },
+    color: '#8b6914',
+    accent: '#a07818',
+  },
+  dining_table_large: {
+    label: 'Velký jídelní stůl',
+    icon: '🍽️',
+    size: { w: 1.6, h: 0.75, d: 0.9 },
+    color: '#7a5a10',
+    accent: '#9a7020',
   },
   chair: {
     label: 'Židle',
@@ -244,11 +274,32 @@ const FURNITURE_ITEMS = {
     accent: '#718096',
   },
   desk: {
-    label: 'Psací stůl',
+    label: 'Velký psací stůl',
     icon: '🖥️',
     size: { w: 1.4, h: 0.75, d: 0.7 },
     color: '#654321',
     accent: '#8b5a2b',
+  },
+  desk_small: {
+    label: 'Malý psací stůl',
+    icon: '📝',
+    size: { w: 0.9, h: 0.72, d: 0.55 },
+    color: '#7a5a3a',
+    accent: '#9a7048',
+  },
+  desk_medium: {
+    label: 'Střední psací stůl',
+    icon: '✏️',
+    size: { w: 1.2, h: 0.74, d: 0.65 },
+    color: '#654321',
+    accent: '#8b5a2b',
+  },
+  desk_large: {
+    label: 'Velký psací stůl',
+    icon: '🖥️',
+    size: { w: 1.6, h: 0.75, d: 0.75 },
+    color: '#5c4020',
+    accent: '#7a5030',
   },
   toilet: {
     label: 'WC',
@@ -301,13 +352,13 @@ export const CATALOG_CATEGORIES = [
     id: 'kitchen',
     label: 'Kuchyně & jídelna',
     icon: '🍳',
-    items: ['kitchen', 'dining_table', 'chair'],
+    items: ['kitchen', 'kitchen_unit', 'dining_table_small', 'dining_table_medium', 'dining_table_large', 'chair'],
   },
   {
     id: 'office',
     label: 'Pracovna',
     icon: '🖥️',
-    items: ['desk', 'chair', 'bookshelf', 'shelf_medium', 'shelf_medium_cabinet', 'lamp_small', 'lamp_medium'],
+    items: ['desk_small', 'desk_medium', 'desk_large', 'chair', 'bookshelf', 'shelf_medium', 'shelf_medium_cabinet', 'lamp_small', 'lamp_medium'],
   },
   {
     id: 'bathroom',
@@ -424,8 +475,10 @@ export function createFurnitureMesh(type, mode = 'preview') {
       buildPlantLarge(group, w, h, d, def, isArchitect);
       break;
     case 'kitchen':
-      addBox(group, w, h, d, 0, h * 0.5, 0, def.color, isArchitect);
-      addBox(group, w * 0.95, h * 0.05, d * 0.9, 0, h + 0.025, 0, def.accent, isArchitect);
+      buildKitchenLine(group, w, h, d, def, isArchitect);
+      break;
+    case 'kitchen_unit':
+      buildKitchenUnit(group, w, h, d, def, isArchitect);
       break;
     case 'lamp':
       buildLampLarge(group, w, h, d, def, isArchitect);
@@ -444,9 +497,17 @@ export function createFurnitureMesh(type, mode = 'preview') {
       addBox(group, w * 0.9, h * 0.08, d * 0.85, 0, h * 0.89, 0, def.accent, isArchitect);
       addLegs(group, w * 0.85, d * 0.85, h * 0.4, def.accent, isArchitect);
       break;
+    case 'desk':
+    case 'desk_small':
+    case 'desk_medium':
+    case 'desk_large':
+      buildDesk(group, w, h, d, def, isArchitect);
+      break;
     case 'dining_table':
-      addBox(group, w, h * 0.06, d, 0, h * 0.97, 0, def.color, isArchitect);
-      addLegs(group, w * 0.85, d * 0.85, h * 0.94, def.accent, isArchitect);
+    case 'dining_table_small':
+    case 'dining_table_medium':
+    case 'dining_table_large':
+      buildDiningTable(group, w, h, d, def, isArchitect);
       break;
     case 'toilet':
       buildToilet(group, w, h, d, def, isArchitect);
@@ -463,6 +524,201 @@ export function createFurnitureMesh(type, mode = 'preview') {
   }
 
   return group;
+}
+
+function buildKitchenUnit(group, w, h, d, def, architect) {
+  const baseH = h * 0.7;
+  const topH = h * 0.05;
+  const splashH = h * 0.2;
+  const topColor = def.top ?? '#e8e8e8';
+
+  addBox(group, w, baseH, d, 0, baseH * 0.5, 0, def.color, architect);
+  addBox(group, w * 0.86, baseH * 0.8, 0.02, 0, baseH * 0.48, d * 0.48, def.accent, architect);
+  addBox(group, w * 0.3, 0.02, 0.03, 0, baseH * 0.52, d * 0.49, '#b0b0b0', architect);
+  addBox(group, w * 0.86, baseH * 0.22, 0.02, 0, baseH * 0.2, d * 0.48, def.accent, architect);
+  addBox(group, w * 0.25, 0.015, 0.025, 0, baseH * 0.2, d * 0.49, '#b0b0b0', architect);
+
+  addBox(group, w * 1.03, topH, d * 1.02, 0, baseH + topH * 0.5, 0, topColor, architect);
+  addBox(group, w * 0.5, 0.07, d * 0.42, 0, baseH + topH + 0.035, d * 0.06, '#c8d0d8', architect);
+  addBox(group, w * 0.4, 0.035, d * 0.32, 0, baseH + topH + 0.018, d * 0.08, '#a8b8c8', architect);
+  addBox(group, w * 0.28, 0.012, d * 0.28, w * 0.22, baseH + topH + 0.008, -d * 0.08, '#2a2a2a', architect);
+
+  addBox(group, w, splashH, 0.02, 0, baseH + topH + splashH * 0.5, -d * 0.49, '#fafafa', architect);
+  addBox(group, w * 0.12, splashH * 0.35, 0.03, 0, baseH + topH + splashH * 0.65, -d * 0.46, '#c0c0c0', architect);
+}
+
+function buildKitchenLine(group, w, h, d, def, architect) {
+  const baseH = h * 0.7;
+  const topH = h * 0.05;
+  const splashH = h * 0.2;
+  const topColor = def.top ?? '#e8e8e8';
+  const segW = w * 0.47;
+  const gap = w * 0.03;
+
+  for (const xOff of [-segW * 0.5 - gap * 0.5, segW * 0.5 + gap * 0.5]) {
+    addBox(group, segW, baseH, d, xOff, baseH * 0.5, 0, def.color, architect);
+    addBox(group, segW * 0.88, baseH * 0.8, 0.02, xOff, baseH * 0.48, d * 0.48, def.accent, architect);
+    addBox(group, segW * 0.3, 0.02, 0.03, xOff, baseH * 0.52, d * 0.49, '#b0b0b0', architect);
+  }
+
+  addBox(group, w * 0.98, topH, d * 1.02, 0, baseH + topH * 0.5, 0, topColor, architect);
+  addBox(group, w * 0.35, 0.07, d * 0.42, -w * 0.22, baseH + topH + 0.035, d * 0.06, '#c8d0d8', architect);
+  addBox(group, w * 0.28, 0.012, d * 0.28, w * 0.22, baseH + topH + 0.008, -d * 0.08, '#2a2a2a', architect);
+  addBox(group, w, splashH, 0.02, 0, baseH + topH + splashH * 0.5, -d * 0.49, '#fafafa', architect);
+}
+
+function buildDiningTable(group, w, h, d, def, architect) {
+  const topT = h * 0.06;
+  const topY = h - topT * 0.5;
+  const legH = h * 0.9;
+  const compact = w < 1.05;
+
+  addBox(group, w, topT, d, 0, topY, 0, def.color, architect);
+  addBox(group, w * 1.01, topT * 0.35, d * 1.01, 0, topY - topT * 0.32, 0, def.accent, architect);
+
+  if (compact) {
+    addCylinder(group, w * 0.14, legH * 0.55, def.accent, architect, { y: legH * 0.28 });
+    addCylinder(group, w * 0.28, topT * 0.5, def.color, architect, { y: legH * 0.58 });
+    addBox(group, w * 0.45, topT * 0.25, d * 0.45, 0, topT * 0.12, 0, def.accent, architect);
+  } else {
+    addLegs(group, w * 0.82, d * 0.82, legH, def.accent, architect);
+    addBox(group, w * 0.88, topT * 0.45, 0.04, 0, legH + topT * 0.2, d * 0.4, def.accent, architect);
+    addBox(group, w * 0.88, topT * 0.45, 0.04, 0, legH + topT * 0.2, -d * 0.4, def.accent, architect);
+    addBox(group, 0.04, topT * 0.45, d * 0.82, -w * 0.4, legH + topT * 0.2, 0, def.accent, architect);
+    addBox(group, 0.04, topT * 0.45, d * 0.82, w * 0.4, legH + topT * 0.2, 0, def.accent, architect);
+  }
+}
+
+function addDeskLamp(group, x, y, z, scale, architect) {
+  const s = scale;
+  addCylinder(group, s * 0.045, s * 0.015, '#333333', architect, { x, y: y + s * 0.008, z });
+  addCylinder(group, s * 0.008, s * 0.1, '#888888', architect, { x, y: y + s * 0.06, z });
+  addBox(group, s * 0.07, s * 0.05, s * 0.07, x, y + s * 0.12, z, '#fff4dc', architect, { emissive: '#fff4dc' });
+}
+
+function addLaptop(group, x, y, z, scale, architect) {
+  const s = scale * 1.2;
+  const bw = s * 0.3;
+  const bd = s * 0.22;
+  const top = y;
+
+  addBox(group, bw, 0.02, bd, x, top + 0.01, z, '#9aa0b0', architect);
+  addBox(group, bw * 0.92, 0.008, bd * 0.64, x, top + 0.018, z + bd * 0.1, '#1e1e28', architect);
+  addBox(group, bw * 0.36, 0.006, bd * 0.28, x, top + 0.017, z - bd * 0.16, '#5a6070', architect);
+
+  const backZ = z + bd * 0.44;
+  addBox(group, bw * 0.92, 0.01, 0.014, x, top + 0.014, backZ, '#707888', architect);
+
+  const screenH = s * 0.18;
+  const screenW = bw * 0.9;
+  const tilt = -0.68;
+  const screenY = top + 0.03 + screenH * 0.38;
+  const screenZ = backZ - screenH * 0.28;
+
+  addLeaf(group, screenW, screenH, x, screenY, screenZ, '#2a3040', architect, 0, tilt);
+  addLeaf(group, screenW * 0.84, screenH * 0.8, x, screenY + 0.012, screenZ + 0.018, '#3d8fd9', architect, 0, tilt);
+  addLeaf(group, screenW * 0.2, screenH * 0.06, x, screenY - screenH * 0.32, screenZ + 0.01, '#888888', architect, 0, tilt);
+}
+
+function addDeskDrawerUnit(group, unitW, unitH, d, unitX, def, architect) {
+  const frontZ = d * 0.46;
+  const depth = d * 0.9;
+  const drawerCount = 3;
+  const drawerH = unitH / drawerCount;
+
+  addBox(group, unitW, unitH, depth, unitX, unitH * 0.5, 0, def.accent, architect);
+  addBox(group, unitW + 0.01, unitH + 0.01, depth + 0.01, unitX, unitH * 0.5, -0.005, '#4a3525', architect);
+
+  for (let i = 0; i < drawerCount; i++) {
+    const dy = drawerH * (i + 0.5);
+    addBox(group, unitW * 0.9, drawerH * 0.76, 0.02, unitX, dy, frontZ, def.color, architect);
+    addBox(group, unitW * 0.24, 0.018, 0.024, unitX, dy, frontZ + 0.012, '#b8b8b8', architect);
+    if (i < drawerCount - 1) {
+      addBox(group, unitW * 0.92, 0.005, 0.022, unitX, drawerH * (i + 1), frontZ - 0.001, '#5c4033', architect);
+    }
+  }
+
+  addBox(group, unitW * 0.94, 0.04, depth * 0.85, unitX, 0.02, 0, '#3a2a1a', architect);
+}
+
+function addPaperStack(group, x, y, z, scale, architect) {
+  const s = scale;
+  const colors = ['#f8f8f8', '#f0f0f0', '#ffffff'];
+  for (let i = 0; i < 3; i++) {
+    addBox(group, s * 0.14, 0.004, s * 0.1, x + i * 0.008, y + 0.002 + i * 0.004, z + i * 0.006, colors[i], architect);
+  }
+}
+
+function addNotebook(group, x, y, z, scale, architect) {
+  const s = scale;
+  addBox(group, s * 0.11, 0.007, s * 0.15, x, y + 0.0035, z, '#d45a3a', architect);
+  addBox(group, s * 0.1, 0.005, s * 0.142, x + 0.003, y + 0.007, z + 0.004, '#f5f5ec', architect);
+  addBox(group, s * 0.014, 0.009, s * 0.13, x - s * 0.048, y + 0.0045, z, '#b8b8b8', architect);
+  for (let i = 0; i < 4; i++) {
+    addBox(group, s * 0.008, s * 0.008, 0.006, x - s * 0.048, y + 0.01 + i * s * 0.018, z - s * 0.04 + i * s * 0.02, '#909090', architect);
+  }
+}
+
+function addDeskMug(group, x, y, z, scale, architect) {
+  const s = scale;
+  addCylinder(group, s * 0.035, s * 0.06, '#d8e0e8', architect, { x, y: y + s * 0.03, z });
+  addBox(group, s * 0.04, s * 0.025, s * 0.02, x + s * 0.04, y + s * 0.04, z, '#d8e0e8', architect);
+}
+
+function addMonitor(group, x, y, z, scale, architect) {
+  const s = scale;
+  addBox(group, s * 0.22, s * 0.14, 0.012, x, y + s * 0.08, z, '#1a1a2e', architect);
+  addBox(group, s * 0.06, s * 0.05, 0.04, x, y + s * 0.02, z + 0.02, '#333333', architect);
+  addBox(group, s * 0.1, 0.01, s * 0.06, x, y + 0.005, z + 0.02, '#444444', architect);
+}
+
+function addDeskAccessories(group, w, h, d, architect, level) {
+  const topY = h * 0.97;
+  const scale = Math.min(1, w / 1.2);
+
+  addDeskLamp(group, -w * 0.32, topY, -d * 0.22, scale, architect);
+  addPaperStack(group, w * 0.3, topY, -d * 0.18, scale, architect);
+  addLaptop(group, w * 0.02, topY, -d * 0.06, scale, architect);
+
+  if (level >= 2) {
+    addNotebook(group, -w * 0.12, topY, d * 0.12, scale, architect);
+    addDeskMug(group, w * 0.35, topY, d * 0.08, scale, architect);
+  }
+
+  if (level >= 3) {
+    addPaperStack(group, w * 0.38, topY, -d * 0.05, scale * 0.9, architect);
+    addBox(group, scale * 0.06, scale * 0.08, scale * 0.06, w * 0.38, topY + scale * 0.04, -d * 0.15, '#c0c0c0', architect);
+  }
+}
+
+function buildDesk(group, w, h, d, def, architect) {
+  const topT = h * 0.05;
+  const topY = h - topT * 0.5;
+  const legH = h * 0.9;
+  const compact = w < 1.05;
+  const level = compact ? 1 : w < 1.35 ? 2 : 3;
+
+  addBox(group, w, topT, d, 0, topY, 0, def.color, architect);
+
+  if (compact) {
+    addLegs(group, w * 0.78, d * 0.78, legH, def.accent, architect);
+  } else {
+    const unitW = w * 0.32;
+    const unitX = -w * 0.5 + unitW * 0.5 + 0.03;
+    const unitH = legH * 0.88;
+    addDeskDrawerUnit(group, unitW, unitH, d, unitX, def, architect);
+    const lw = 0.04;
+    for (const [lx, lz] of [
+      [w * 0.3, -d * 0.32],
+      [w * 0.3, d * 0.32],
+      [w * 0.42, -d * 0.32],
+      [w * 0.42, d * 0.32],
+    ]) {
+      addBox(group, lw, legH, lw, lx, legH * 0.5, lz, def.accent, architect);
+    }
+  }
+
+  addDeskAccessories(group, w, h, d, architect, level);
 }
 
 function addPillow(group, x, y, z, pw, ph, pd, architect) {
