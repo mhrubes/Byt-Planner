@@ -1669,6 +1669,12 @@ export class BytPlannerApp {
         toggleLabel: open ? '🔒 Zavřít dvířka' : '🫧 Otevřít dvířka',
       };
     }
+    if (type === 'kitchen_fridge') {
+      return {
+        title: 'Lednice',
+        toggleLabel: open ? '🔒 Zavřít lednici' : '🧊 Otevřít lednici',
+      };
+    }
     if (isShelfCabinetType(type)) {
       return {
         title: 'Skříňka',
@@ -1755,6 +1761,7 @@ export class BytPlannerApp {
     if (type === 'bath_shelf') return 'Otevře lamelová dvířka s ručníky uvnitř · klávesa O';
     if (type === 'kitchen_oven') return 'Sklopí dvířka trouby a ukáže plech uvnitř · klávesa O';
     if (type === 'kitchen_dishwasher') return 'Sklopí dvířka myčky a ukáže talíře uvnitř · klávesa O';
+    if (type === 'kitchen_fridge') return 'Otevře dvířka lednice a ukáže police s jídlem · klávesa O';
     if (isShelfCabinetType(type)) return 'Otevře nebo zavře dvířka skříňky · klávesa O';
     if (isDoorType(type)) return 'Přepne otevřený průchod ve zdi · klávesa O';
     return 'Přepne otevřený průchod ve zdi · klávesa O';

@@ -342,6 +342,15 @@ const FURNITURE_ITEMS = {
     steel: '#c0c4cc',
     mountOffset: 0.9,
   },
+  kitchen_fridge: {
+    label: 'Lednice',
+    icon: '🧊',
+    size: { w: 0.65, h: 1.9, d: 0.62 },
+    color: '#f0f2f6',
+    accent: '#b8c0c8',
+    inner: '#f8fafc',
+    handle: '#9aa4ae',
+  },
   dining_table: {
     label: 'Velký jídelní stůl',
     icon: '🍽️',
@@ -494,7 +503,7 @@ export const CATALOG_CATEGORIES = [
     id: 'kitchen',
     label: 'Kuchyně & jídelna',
     icon: '🍳',
-    items: ['kitchen', 'kitchen_unit', 'kitchen_oven', 'kitchen_dishwasher', 'kitchen_hood', 'dining_table_small', 'dining_table_medium', 'dining_table_large', 'chair'],
+    items: ['kitchen', 'kitchen_unit', 'kitchen_oven', 'kitchen_dishwasher', 'kitchen_hood', 'kitchen_fridge', 'dining_table_small', 'dining_table_medium', 'dining_table_large', 'chair'],
   },
   {
     id: 'office',
@@ -580,6 +589,7 @@ export const OPENABLE_TYPES = new Set([
   'bath_shelf',
   'kitchen_oven',
   'kitchen_dishwasher',
+  'kitchen_fridge',
   ...CABINET_TYPES,
 ]);
 
@@ -729,6 +739,9 @@ export function createFurnitureMesh(type, mode = 'preview', {
       break;
     case 'kitchen_hood':
       buildKitchenHood(group, w, h, d, def, isArchitect);
+      break;
+    case 'kitchen_fridge':
+      buildKitchenFridge(group, w, h, d, def, isArchitect);
       break;
     case 'lamp':
       buildLampLarge(group, w, h, d, def, isArchitect);
@@ -957,6 +970,107 @@ function buildKitchenDishwasher(group, w, h, d, def, architect) {
 
   addBox(group, w * 1.03, topH, d * 1.02, 0, baseH + topH * 0.5, 0, topColor, architect);
   addBox(group, w, splashH, 0.02, 0, baseH + topH + splashH * 0.5, -d * 0.49, '#fafafa', architect);
+}
+
+function addFridgeFoodBox(group, x, y, z, bw, bh, bd, color, architect) {
+  addBox(group, bw, bh, bd, x, y, z, color, architect, { keepColor: true });
+}
+
+function addFridgeProduce(group, x, y, z, color, architect, radius = 0.038) {
+  addSphere(group, radius, y, color, architect, { x, z, keepColor: true });
+}
+
+function buildKitchenFridge(group, w, h, d, def, architect) {
+  const body = def.color ?? '#f0f2f6';
+  const inner = def.inner ?? '#f8fafc';
+  const trim = def.accent ?? '#b8c0c8';
+  const handle = def.handle ?? '#9aa4ae';
+  const side = 0.04;
+  const doorT = 0.022;
+  const frontZ = d * 0.5 - doorT * 0.5;
+  const innerW = w - side * 2;
+  const cavityDepth = d * 0.5;
+  const cavityZ = -d * 0.5 + side + cavityDepth * 0.5;
+  const splitY = h * 0.68;
+  const shell = { keepColor: true, partRole: 'fridge-shell' };
+  const cavity = { keepColor: true, partRole: 'fridge-interior' };
+
+  addBox(group, w, side, d, 0, h - side * 0.5, 0, body, architect, shell);
+  addBox(group, w, side, d, 0, side * 0.5, 0, body, architect, shell);
+  addBox(group, side, h - side * 2, d, -w * 0.5 + side * 0.5, h * 0.5, 0, body, architect, shell);
+  addBox(group, side, h - side * 2, d, w * 0.5 - side * 0.5, h * 0.5, 0, body, architect, shell);
+  addBox(group, innerW, h - side * 2, side, 0, h * 0.5, -d * 0.5 + side * 0.5, trim, architect, shell);
+
+  addBox(group, innerW, h - side * 2, 0.02, 0, h * 0.5, -d * 0.5 + side + 0.01, inner, architect, cavity);
+  addBox(group, 0.02, h - side * 2, cavityDepth, -innerW * 0.5 + 0.01, h * 0.5, cavityZ, inner, architect, cavity);
+  addBox(group, 0.02, h - side * 2, cavityDepth, innerW * 0.5 - 0.01, h * 0.5, cavityZ, inner, architect, cavity);
+  addBox(group, innerW, 0.02, cavityDepth, 0, side + 0.01, cavityZ, inner, architect, cavity);
+  addBox(group, innerW, 0.02, cavityDepth, 0, h - side - 0.01, cavityZ, inner, architect, cavity);
+  addBox(group, innerW * 0.94, 0.01, cavityDepth * 0.9, 0, splitY, cavityZ, trim, architect, cavity);
+
+  const shelfDepth = cavityDepth * 0.82;
+  const shelfFrontZ = cavityZ + cavityDepth * 0.22;
+  const shelfLevels = [h * 0.2, h * 0.38, h * 0.54, h * 0.7, h * 0.86, h * 1.02];
+  for (const shelfY of shelfLevels) {
+    addBox(group, innerW * 0.9, 0.014, shelfDepth, 0, shelfY, shelfFrontZ, '#e8eef4', architect, {
+      keepColor: true,
+      isGlass: true,
+      partRole: 'fridge-interior',
+    });
+    addBox(group, innerW * 0.86, 0.004, shelfDepth * 0.92, 0, shelfY + 0.008, shelfFrontZ, '#d0dae4', architect, cavity);
+  }
+
+  const itemZ = shelfFrontZ + shelfDepth * 0.18;
+  addFridgeFoodBox(group, -innerW * 0.2, h * 0.9, itemZ, innerW * 0.24, 0.12, 0.11, '#e85a4a', architect);
+  addFridgeFoodBox(group, innerW * 0.14, h * 0.9, itemZ + 0.04, innerW * 0.2, 0.1, 0.1, '#4a90c8', architect);
+  addFridgeFoodBox(group, 0, h * 0.9, itemZ - 0.02, innerW * 0.16, 0.09, 0.09, '#f0e8d0', architect);
+
+  addFridgeFoodBox(group, -innerW * 0.18, h * 0.74, itemZ, innerW * 0.14, 0.14, 0.1, '#fff8f0', architect);
+  addFridgeFoodBox(group, innerW * 0.16, h * 0.74, itemZ + 0.03, innerW * 0.12, 0.16, 0.09, '#f5f0e8', architect);
+  addFridgeProduce(group, -innerW * 0.04, h * 0.76, itemZ + 0.08, '#3a9e4a', architect, 0.042);
+  addFridgeProduce(group, innerW * 0.06, h * 0.75, itemZ + 0.1, '#e87830', architect, 0.04);
+
+  addFridgeFoodBox(group, -innerW * 0.22, h * 0.56, itemZ, innerW * 0.13, 0.15, 0.1, '#f8d878', architect);
+  addFridgeProduce(group, -innerW * 0.08, h * 0.58, itemZ + 0.06, '#6ab04c', architect, 0.04);
+  addFridgeProduce(group, innerW * 0.04, h * 0.57, itemZ + 0.08, '#c83838', architect, 0.038);
+  addFridgeProduce(group, innerW * 0.18, h * 0.58, itemZ + 0.04, '#8bc34a', architect, 0.036);
+  addCylinder(group, 0.032, 0.14, '#f0f4f8', architect, {
+    x: -innerW * 0.02,
+    y: h * 0.58,
+    z: itemZ + 0.1,
+    keepColor: true,
+    partRole: 'fridge-interior',
+  });
+
+  addFridgeFoodBox(group, innerW * 0.16, h * 0.4, itemZ, innerW * 0.1, 0.18, 0.09, '#fffef8', architect);
+  addFridgeFoodBox(group, -innerW * 0.14, h * 0.38, itemZ + 0.05, innerW * 0.16, 0.11, 0.1, '#e8f0ff', architect);
+
+  const drawerH = h * 0.14;
+  const drawerY = side + drawerH * 0.5;
+  const drawerZ = cavityZ + cavityDepth * 0.15;
+  addBox(group, innerW * 0.88, drawerH, cavityDepth * 0.72, 0, drawerY, drawerZ, '#dce8dc', architect, cavity);
+  addBox(group, innerW * 0.82, drawerH * 0.65, cavityDepth * 0.65, 0, drawerY, drawerZ + cavityDepth * 0.08, '#e8f4e8', architect, cavity);
+  addFridgeProduce(group, -innerW * 0.16, drawerY + 0.02, drawerZ + cavityDepth * 0.28, '#4a9a3a', architect, 0.04);
+  addFridgeProduce(group, 0, drawerY + 0.01, drawerZ + cavityDepth * 0.32, '#8bc34a', architect, 0.038);
+  addFridgeProduce(group, innerW * 0.14, drawerY + 0.02, drawerZ + cavityDepth * 0.26, '#e05030', architect, 0.035);
+  addFridgeProduce(group, -innerW * 0.04, drawerY - 0.01, drawerZ + cavityDepth * 0.3, '#6ab04c', architect, 0.032);
+
+  const doorW = innerW;
+  const doorH = h - side * 2;
+  const doorPivot = new THREE.Group();
+  doorPivot.position.set(-w * 0.5 + side, h * 0.5, frontZ);
+  doorPivot.userData.partRole = 'cabinet-door-pivot';
+  group.add(doorPivot);
+  addBox(doorPivot, doorW, doorH, doorT, doorW * 0.5, 0, 0, body, architect, {
+    partRole: 'cabinet-door',
+    doubleSided: true,
+    keepColor: true,
+  });
+  addBox(doorPivot, 0.03, 0.14, 0.024, doorW * 0.88, splitY - h * 0.5, doorT * 0.55, handle, architect, {
+    partRole: 'cabinet-handle',
+    doubleSided: true,
+    keepColor: true,
+  });
 }
 
 function buildKitchenHood(group, w, h, d, def, architect) {
