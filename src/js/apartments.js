@@ -251,8 +251,8 @@ export const APARTMENT_TEMPLATES = {
       // Kuchyně (9,0)–(16,5)
       { x1: 9, z1: 5, x2: 16, z2: 5 },
       { x1: 9, z1: 0, x2: 9, z2: 5 },
-      // Obývák — částečná příčka u chodby
-      { x1: 6, z1: 9, x2: 11, z2: 9 },
+      // Obývák — částečná příčka u chodby (mimo dveře do ložnice 2)
+      { x1: 6.5, z1: 9.6, x2: 11, z2: 9.6 },
     ],
     defaultFurniture: [
       // Vchod a okna
@@ -263,14 +263,14 @@ export const APARTMENT_TEMPLATES = {
       { type: 'window', x: 16, z: 8, rotation: -Math.PI / 2 },
       { type: 'balcony_door', x: 16, z: 10, rotation: -Math.PI / 2, doorOpen: false },
       // Ložnice 1
-      { type: 'door', x: 6, z: 4, rotation: Math.PI / 2, doorOpen: false },
+      { type: 'door', x: 6, z: 5, rotation: Math.PI / 2, doorOpen: false },
       { type: 'bed_double', x: 3, z: 2, rotation: 0 },
       { type: 'nightstand', x: 1, z: 1, rotation: 0 },
       { type: 'lamp_small', x: 1, z: 1, rotation: 0 },
       { type: 'wardrobe', x: 0.5, z: 3, rotation: Math.PI / 2 },
       { type: 'desk_medium', x: 4.5, z: 5, rotation: Math.PI },
       // Ložnice 2
-      { type: 'door', x: 6, z: 9, rotation: Math.PI / 2, doorOpen: false },
+      { type: 'door', x: 6, z: 8.5, rotation: Math.PI / 2, doorOpen: false },
       { type: 'bed_single', x: 2, z: 8.5, rotation: 0 },
       { type: 'wardrobe', x: 0.5, z: 10, rotation: Math.PI / 2 },
       { type: 'desk_small', x: 4, z: 11, rotation: Math.PI },
@@ -472,6 +472,115 @@ function splitWallByOpening(wall, ox1, oz1, ox2, oz2, gridSize) {
   return pieces;
 }
 
+function doorOpeningBounds(door, catalog, gridSize = GRID_SIZE) {
+  const def = catalog[door.type];
+  const hw = def.size.w / 2 / gridSize;
+  const r = door.rotation ?? 0;
+  const ux = Math.cos(r);
+  const uz = -Math.sin(r);
+  const pad = (WALL_THICKNESS * 1.25) / gridSize;
+
+  const ax1 = door.x - ux * hw - pad;
+  const az1 = door.z - uz * hw - pad;
+  const ax2 = door.x + ux * hw + pad;
+  const az2 = door.z + uz * hw + pad;
+
+  return {
+    xMin: Math.min(ax1, ax2),
+    xMax: Math.max(ax1, ax2),
+    zMin: Math.min(az1, az2),
+    zMax: Math.max(az1, az2),
+    ux,
+    uz,
+  };
+}
+
+function wallsAreParallel(wall, bounds) {
+  const w = normalizeWall(wall);
+  const wdx = w.x2 - w.x1;
+  const wdz = w.z2 - w.z1;
+  const wlen = Math.hypot(wdx, wdz);
+  if (wlen < 0.01) return false;
+  const wux = wdx / wlen;
+  const wuz = wdz / wlen;
+  return Math.abs(bounds.ux * wuz - bounds.uz * wux) < 0.08;
+}
+
+/** Vyřízne kolmou zeď protínající dveřní otvor v půdorysu */
+function splitWallByCrossingDoor(wall, bounds) {
+  const w = normalizeWall(wall);
+  const eps = 0.02;
+  const horizontal = Math.abs(w.z2 - w.z1) < eps;
+  const vertical = Math.abs(w.x2 - w.x1) < eps;
+
+  if (horizontal) {
+    const z = w.z1;
+    const halfThick = (WALL_THICKNESS / GRID_SIZE) * 0.6;
+    if (z < bounds.zMin - halfThick || z > bounds.zMax + halfThick) return [wall];
+    const wx1 = Math.min(w.x1, w.x2);
+    const wx2 = Math.max(w.x1, w.x2);
+    if (wx2 < bounds.xMin + eps || wx1 > bounds.xMax - eps) return [wall];
+    const pieces = [];
+    if (wx1 < bounds.xMin - eps) {
+      pieces.push({ x1: wx1, z1: z, x2: bounds.xMin, z2: z });
+    }
+    if (wx2 > bounds.xMax + eps) {
+      pieces.push({ x1: bounds.xMax, z1: z, x2: wx2, z2: z });
+    }
+    return pieces;
+  }
+
+  if (vertical) {
+    const x = w.x1;
+    const halfThick = (WALL_THICKNESS / GRID_SIZE) * 0.6;
+    if (x < bounds.xMin - halfThick || x > bounds.xMax + halfThick) return [wall];
+    const wz1 = Math.min(w.z1, w.z2);
+    const wz2 = Math.max(w.z1, w.z2);
+    if (wz2 < bounds.zMin + eps || wz1 > bounds.zMax - eps) return [wall];
+    const pieces = [];
+    if (wz1 < bounds.zMin - eps) {
+      pieces.push({ x1: x, z1: wz1, x2: x, z2: bounds.zMin });
+    }
+    if (wz2 > bounds.zMax + eps) {
+      pieces.push({ x1: x, z1: bounds.zMax, x2: x, z2: wz2 });
+    }
+    return pieces;
+  }
+
+  return [wall];
+}
+
+/** Typ segmentu vůči dveřím — krátké zárubně u otvoru se nevykreslují */
+export function classifyDoorWallSegment(wall, doors, catalog, gridSize = GRID_SIZE) {
+  const seg = normalizeWall(wall);
+  const eps = 0.05;
+  const z1 = Math.min(seg.z1, seg.z2);
+  const z2 = Math.max(seg.z1, seg.z2);
+  const x1 = Math.min(seg.x1, seg.x2);
+  const x2 = Math.max(seg.x1, seg.x2);
+  const horizontal = Math.abs(seg.z2 - seg.z1) < eps;
+  const vertical = Math.abs(seg.x2 - seg.x1) < eps;
+  const segLen = Math.hypot(seg.x2 - seg.x1, seg.z2 - seg.z1);
+
+  for (const door of doors) {
+    const bounds = doorOpeningBounds(door, catalog, gridSize);
+    if (!wallsAreParallel(wall, bounds)) continue;
+
+    const dist = distPointToSegment(door.x, door.z, seg.x1, seg.z1, seg.x2, seg.z2);
+    if (dist > 0.15) continue;
+
+    if (vertical) {
+      const overlapZ = Math.min(z2, bounds.zMax) - Math.max(z1, bounds.zMin);
+      if (overlapZ > eps && overlapZ >= segLen - eps * 2) return 'inside';
+    } else if (horizontal) {
+      const overlapX = Math.min(x2, bounds.xMax) - Math.max(x1, bounds.xMin);
+      if (overlapX > eps && overlapX >= segLen - eps * 2) return 'inside';
+    }
+  }
+
+  return 'normal';
+}
+
 /** Najde zeď, na které dveře leží (pro barvu nadpraží) */
 export function findWallForDoor(door, walls, catalog, gridSize = GRID_SIZE) {
   const def = catalog[door.type];
@@ -513,7 +622,8 @@ export function applyDoorGaps(walls, doors, catalog, gridSize = GRID_SIZE) {
     const def = catalog[door.type];
     if (!def) continue;
 
-    const hw = def.size.w / 2;
+    const bounds = doorOpeningBounds(door, catalog, gridSize);
+    const hw = def.size.w / 2 + 0.05;
     const px = door.x * gridSize;
     const pz = door.z * gridSize;
     const r = door.rotation ?? 0;
@@ -526,7 +636,11 @@ export function applyDoorGaps(walls, doors, catalog, gridSize = GRID_SIZE) {
 
     const next = [];
     for (const wall of result) {
-      next.push(...splitWallByOpening(wall, ox1, oz1, ox2, oz2, gridSize));
+      if (wallsAreParallel(wall, bounds)) {
+        next.push(...splitWallByOpening(wall, ox1, oz1, ox2, oz2, gridSize));
+      } else {
+        next.push(...splitWallByCrossingDoor(wall, bounds));
+      }
     }
     result = next;
   }

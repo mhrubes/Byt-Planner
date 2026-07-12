@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { GRID_SIZE, WALL_HEIGHT, WALL_THICKNESS, applyDoorGaps, carpetRectFromGrid, FURNITURE_GRID_SUBDIVISIONS, wallKey, findParentWall, findWallForDoor } from './apartments.js';
+import { GRID_SIZE, WALL_HEIGHT, WALL_THICKNESS, applyDoorGaps, carpetRectFromGrid, FURNITURE_GRID_SUBDIVISIONS, wallKey, findParentWall, findWallForDoor, classifyDoorWallSegment } from './apartments.js';
 import {
   createFurnitureMesh,
   updateFurnitureMaterials,
@@ -379,6 +379,8 @@ export class SceneManager {
     );
 
     for (const w of wallsToRender) {
+      const role = classifyDoorWallSegment(w, doors, FURNITURE_CATALOG, GRID_SIZE);
+      if (role === 'inside') continue;
       const mesh = this.createWallMesh(w, isPreview);
       if (mesh) this.wallsGroup.add(mesh);
     }
