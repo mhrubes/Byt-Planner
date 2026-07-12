@@ -51,7 +51,16 @@ export class BytPlannerApp {
 
   renderUI() {
     this.root.innerHTML = `
-      <div id="canvas-container"></div>
+      <div id="canvas-container">
+        <div class="preview-openable-popover hidden" id="preview-openable-popover">
+          <p class="preview-openable-popover-title" id="preview-openable-title"></p>
+          <button type="button" class="preview-openable-popover-btn" id="preview-openable-toggle"></button>
+          <div class="preview-openable-popover-row hidden" id="preview-openable-rotate">
+            <button type="button" class="preview-openable-popover-btn preview-openable-popover-btn--half" id="preview-rotate-left"><span class="preview-btn-icon" aria-hidden="true">↺</span><span>Doleva</span></button>
+            <button type="button" class="preview-openable-popover-btn preview-openable-popover-btn--half" id="preview-rotate-right"><span class="preview-btn-icon" aria-hidden="true">↻</span><span>Doprava</span></button>
+          </div>
+        </div>
+      </div>
       <div class="ui-overlay">
         <header class="top-bar">
           <div class="brand">
@@ -215,6 +224,12 @@ export class BytPlannerApp {
     this.leftPanelToggle = this.root.querySelector('#left-panel-toggle');
     this.doorOptionsPanel = this.root.querySelector('#door-options');
     this.doorOpenToggle = this.root.querySelector('#door-open-toggle');
+    this.previewOpenablePopover = this.root.querySelector('#preview-openable-popover');
+    this.previewOpenableTitle = this.root.querySelector('#preview-openable-title');
+    this.previewOpenableToggle = this.root.querySelector('#preview-openable-toggle');
+    this.previewOpenableRotate = this.root.querySelector('#preview-openable-rotate');
+    this.previewRotateLeft = this.root.querySelector('#preview-rotate-left');
+    this.previewRotateRight = this.root.querySelector('#preview-rotate-right');
     this.openableOptionsTitle = this.root.querySelector('#openable-options-title');
     this.carpetOptionsPanel = this.root.querySelector('#carpet-options');
     this.carpetOptionsTitle = this.root.querySelector('#carpet-options-title');
@@ -677,6 +692,7 @@ export class BytPlannerApp {
 
   initScene() {
     this.scene = new SceneManager(this.canvasContainer);
+    this.scene.onAfterRender = () => this.updatePreviewOpenablePopoverPosition();
   }
 
   getApartmentLabel(key = this.currentApartment) {
@@ -914,6 +930,20 @@ export class BytPlannerApp {
     this.root.querySelector('#clear-save-btn')?.addEventListener('click', () => this.clearAllSave());
     this.root.querySelector('#reset-btn')?.addEventListener('click', () => this.resetCurrentApartment());
     this.leftPanelToggle?.addEventListener('click', () => this.toggleLeftPanel());
+    this.previewOpenableToggle?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.toggleSelectedDoorOpen();
+    });
+    this.previewRotateLeft?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.rotateSelectedStep(-1);
+    });
+    this.previewRotateRight?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.rotateSelectedStep(1);
+    });
+    this.previewOpenablePopover?.addEventListener('pointerdown', (e) => e.stopPropagation());
+
     this.doorOpenToggle?.addEventListener('click', () => this.toggleSelectedDoorOpen());
     this.carpetColorMain?.addEventListener('input', () => this.applyCarpetColor('carpetColor', this.carpetColorMain.value));
     this.carpetColorAccent?.addEventListener('input', () => this.applyCarpetColor('carpetAccent', this.carpetColorAccent.value));
@@ -1026,11 +1056,17 @@ export class BytPlannerApp {
     const hit = this.scene.raycast(e.clientX, e.clientY);
 
     if (this.mode === 'preview') {
-      if (hit?.type === 'wall') {
-        this.selectWall(hit.object);
-      } else {
-        this.clearWallSelection();
+      if (hit?.type === 'furniture' && isOpenableType(hit.object.userData.furnitureType)) {
+        this.selectFurniture(hit.object);
+        return;
       }
+      if (hit?.type === 'wall') {
+        this.clearSelection();
+        this.selectWall(hit.object);
+        return;
+      }
+      this.clearSelection();
+      this.clearWallSelection();
       return;
     }
 
@@ -1260,31 +1296,36 @@ export class BytPlannerApp {
     this.clearWallSelection();
     this.clearSelectionHighlight();
     this.selectedFurniture = obj;
-    if (!obj.userData.selectionRing) {
-      const ringGeo = new THREE.RingGeometry(0.55, 0.65, 32);
-      const ringMat = new THREE.MeshBasicMaterial({
-        color: 0x5b8def,
-        transparent: true,
-        opacity: 0.85,
-        side: THREE.DoubleSide,
-      });
-      const ring = new THREE.Mesh(ringGeo, ringMat);
-      ring.rotation.x = -Math.PI / 2;
-      ring.position.y = 0.03;
-      ring.userData.isSelectionRing = true;
-      obj.add(ring);
-      obj.userData.selectionRing = ring;
+
+    if (this.mode === 'architect') {
+      if (!obj.userData.selectionRing) {
+        const ringGeo = new THREE.RingGeometry(0.55, 0.65, 32);
+        const ringMat = new THREE.MeshBasicMaterial({
+          color: 0x5b8def,
+          transparent: true,
+          opacity: 0.85,
+          side: THREE.DoubleSide,
+        });
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.rotation.x = -Math.PI / 2;
+        ring.position.y = 0.03;
+        ring.userData.isSelectionRing = true;
+        obj.add(ring);
+        obj.userData.selectionRing = ring;
+      }
+      obj.userData.selectionRing.visible = true;
+      if (isCarpetType(obj.userData.furnitureType)) {
+        const span = Math.max(obj.userData.sizeW ?? 1, obj.userData.sizeD ?? 1);
+        const scale = span / 1.2;
+        obj.userData.selectionRing.scale.set(scale, scale, 1);
+      } else {
+        obj.userData.selectionRing.scale.set(1, 1, 1);
+      }
     }
-    obj.userData.selectionRing.visible = true;
-    if (isCarpetType(obj.userData.furnitureType)) {
-      const span = Math.max(obj.userData.sizeW ?? 1, obj.userData.sizeD ?? 1);
-      const scale = span / 1.2;
-      obj.userData.selectionRing.scale.set(scale, scale, 1);
-    } else {
-      obj.userData.selectionRing.scale.set(1, 1, 1);
-    }
+
     this.updateDoorOptionsPanel();
     this.updateCarpetOptionsPanel();
+    this.updatePreviewOpenablePopover();
   }
 
   getActiveCarpetType() {
@@ -1410,63 +1451,133 @@ export class BytPlannerApp {
     if (field === 'carpetAccent') this.carpetStyleDefaults[type].accent = value;
   }
 
+  getOpenableLabels(type, open) {
+    const isDoor = isDoorType(type);
+    const isWindow = type === 'window';
+
+    if (isWindow) {
+      return {
+        title: 'Okno',
+        toggleLabel: open ? '🔒 Zavřít okno' : '🪟 Otevřít okno',
+      };
+    }
+    if (type === 'wardrobe') {
+      return {
+        title: 'Skříň na oblečení',
+        toggleLabel: open ? '🔒 Zavřít dvířka' : '🗄️ Otevřít dvířka',
+      };
+    }
+    if (type === 'bath_shelf') {
+      return {
+        title: 'Bambusová skříňka',
+        toggleLabel: open ? '🔒 Zavřít dvířka' : '🗄️ Otevřít dvířka',
+      };
+    }
+    if (type === 'kitchen_oven') {
+      return {
+        title: 'Trouba',
+        toggleLabel: open ? '🔒 Zavřít dvířka' : '🔥 Otevřít dvířka',
+      };
+    }
+    if (type === 'kitchen_dishwasher') {
+      return {
+        title: 'Myčka',
+        toggleLabel: open ? '🔒 Zavřít dvířka' : '🫧 Otevřít dvířka',
+      };
+    }
+    if (isShelfCabinetType(type)) {
+      return {
+        title: 'Skříňka',
+        toggleLabel: open ? '🔒 Zavřít dvířka' : '🗄️ Otevřít dvířka',
+      };
+    }
+    if (isDoor) {
+      return {
+        title: 'Dveře',
+        toggleLabel: open ? '🔒 Zavřít průchod' : '🚪 Otevřít průchod',
+      };
+    }
+    return {
+      title: 'Balkónové dveře',
+      toggleLabel: open ? '🔒 Zavřít průchod' : '🚪 Otevřít průchod',
+    };
+  }
+
+  getFurniturePopoverAnchor(obj) {
+    const type = obj.userData.furnitureType;
+    const def = FURNITURE_CATALOG[type];
+    let topY = def?.size?.h ?? 1;
+    if (type === 'window') {
+      topY = (def.sillHeight ?? 0.9) + (def.size?.h ?? 1);
+    }
+    const anchor = new THREE.Vector3();
+    obj.getWorldPosition(anchor);
+    anchor.y += topY * 0.92;
+    return anchor;
+  }
+
+  updatePreviewOpenablePopover() {
+    const item = this.selectedFurniture;
+    const show = this.mode === 'preview' && item && isOpenableType(item.userData.furnitureType);
+    this.previewOpenablePopover?.classList.toggle('hidden', !show);
+    if (!show || !this.previewOpenableToggle) return;
+
+    const open = !!item.userData.doorOpen;
+    const { title, toggleLabel } = this.getOpenableLabels(item.userData.furnitureType, open);
+    this.previewOpenableTitle.textContent = title;
+    this.previewOpenableToggle.textContent = toggleLabel;
+    this.previewOpenableToggle.classList.toggle('active', open);
+    this.previewOpenableRotate?.classList.toggle('hidden', !item.userData.rotatable);
+    this.updatePreviewOpenablePopoverPosition();
+  }
+
+  updatePreviewOpenablePopoverPosition() {
+    if (
+      !this.previewOpenablePopover
+      || this.previewOpenablePopover.classList.contains('hidden')
+      || !this.selectedFurniture
+    ) {
+      return;
+    }
+
+    const anchor = this.getFurniturePopoverAnchor(this.selectedFurniture);
+    const pos = this.scene.projectWorldToContainer(anchor);
+    this.previewOpenablePopover.style.left = `${pos.x}px`;
+    this.previewOpenablePopover.style.top = `${pos.y}px`;
+    this.previewOpenablePopover.classList.toggle('is-behind', !pos.visible);
+  }
+
   updateDoorOptionsPanel() {
     const item = this.selectedFurniture;
     const isOpenable = item && isOpenableType(item.userData.furnitureType);
-    const isDoor = item && isDoorType(item.userData.furnitureType);
-    const isWindow = item?.userData.furnitureType === 'window';
 
     this.doorOptionsPanel?.classList.toggle('hidden', !isOpenable || this.mode !== 'architect');
+    this.updatePreviewOpenablePopover();
 
     if (!isOpenable || !this.doorOpenToggle) return;
 
     const open = !!item.userData.doorOpen;
-    if (isWindow) {
-      this.openableOptionsTitle.textContent = 'Okno';
-      this.doorOpenToggle.textContent = open ? '🔒 Zavřít okno' : '🪟 Otevřít okno';
-      this.root.querySelector('#door-open-hint').textContent =
-        'Vyklopí křídlo okna · klávesa O';
-    } else if (item.userData.furnitureType === 'wardrobe') {
-      this.openableOptionsTitle.textContent = 'Skříň na oblečení';
-      this.doorOpenToggle.textContent = open ? '🔒 Zavřít dvířka' : '🗄️ Otevřít dvířka';
-      this.root.querySelector('#door-open-hint').textContent =
-        'Ukáže nebo skryje oblečení ve skříni · klávesa O';
-    } else if (item.userData.furnitureType === 'bath_shelf') {
-      this.openableOptionsTitle.textContent = 'Bambusová skříňka';
-      this.doorOpenToggle.textContent = open ? '🔒 Zavřít dvířka' : '🗄️ Otevřít dvířka';
-      this.root.querySelector('#door-open-hint').textContent =
-        'Otevře lamelová dvířka s ručníky uvnitř · klávesa O';
-    } else if (item.userData.furnitureType === 'kitchen_oven') {
-      this.openableOptionsTitle.textContent = 'Trouba';
-      this.doorOpenToggle.textContent = open ? '🔒 Zavřít dvířka' : '🔥 Otevřít dvířka';
-      this.root.querySelector('#door-open-hint').textContent =
-        'Sklopí dvířka trouby a ukáže plech uvnitř · klávesa O';
-    } else if (item.userData.furnitureType === 'kitchen_dishwasher') {
-      this.openableOptionsTitle.textContent = 'Myčka';
-      this.doorOpenToggle.textContent = open ? '🔒 Zavřít dvířka' : '🫧 Otevřít dvířka';
-      this.root.querySelector('#door-open-hint').textContent =
-        'Sklopí dvířka myčky a ukáže talíře uvnitř · klávesa O';
-    } else if (isShelfCabinetType(item.userData.furnitureType)) {
-      this.openableOptionsTitle.textContent = 'Skříňka';
-      this.doorOpenToggle.textContent = open ? '🔒 Zavřít dvířka' : '🗄️ Otevřít dvířka';
-      this.root.querySelector('#door-open-hint').textContent =
-        'Otevře nebo zavře dvířka skříňky · klávesa O';
-    } else if (isDoor) {
-      this.openableOptionsTitle.textContent = 'Dveře';
-      this.doorOpenToggle.textContent = open ? '🔒 Zavřít průchod' : '🚪 Otevřít průchod';
-      this.root.querySelector('#door-open-hint').textContent =
-        'Přepne otevřený průchod ve zdi · klávesa O';
-    } else {
-      this.openableOptionsTitle.textContent = 'Balkónové dveře';
-      this.doorOpenToggle.textContent = open ? '🔒 Zavřít průchod' : '🚪 Otevřít průchod';
-      this.root.querySelector('#door-open-hint').textContent =
-        'Přepne otevřený průchod ve zdi · klávesa O';
-    }
+    const { title, toggleLabel } = this.getOpenableLabels(item.userData.furnitureType, open);
+    this.openableOptionsTitle.textContent = title;
+    this.doorOpenToggle.textContent = toggleLabel;
+    const hint = this.getOpenableHint(item.userData.furnitureType);
+    this.root.querySelector('#door-open-hint').textContent = hint;
     this.doorOpenToggle.classList.toggle('active', open);
   }
 
+  getOpenableHint(type) {
+    if (type === 'window') return 'Vyklopí křídlo okna · klávesa O';
+    if (type === 'wardrobe') return 'Ukáže nebo skryje oblečení ve skříni · klávesa O';
+    if (type === 'bath_shelf') return 'Otevře lamelová dvířka s ručníky uvnitř · klávesa O';
+    if (type === 'kitchen_oven') return 'Sklopí dvířka trouby a ukáže plech uvnitř · klávesa O';
+    if (type === 'kitchen_dishwasher') return 'Sklopí dvířka myčky a ukáže talíře uvnitř · klávesa O';
+    if (isShelfCabinetType(type)) return 'Otevře nebo zavře dvířka skříňky · klávesa O';
+    if (isDoorType(type)) return 'Přepne otevřený průchod ve zdi · klávesa O';
+    return 'Přepne otevřený průchod ve zdi · klávesa O';
+  }
+
   toggleSelectedDoorOpen() {
-    if (!this.selectedFurniture || this.mode !== 'architect') return;
+    if (!this.selectedFurniture) return;
     if (!isOpenableType(this.selectedFurniture.userData.furnitureType)) return;
 
     const next = !this.selectedFurniture.userData.doorOpen;
@@ -1475,7 +1586,12 @@ export class BytPlannerApp {
       this.scene.refreshWallOpenings();
     }
     this.updateDoorOptionsPanel();
-    this.scheduleSave();
+    if (this.mode === 'architect') {
+      this.scheduleSave();
+    } else {
+      this.persistCurrentApartment();
+      writeSave(this.savedData);
+    }
   }
 
   clearSelectionHighlight() {
@@ -1632,14 +1748,25 @@ export class BytPlannerApp {
     this.scheduleSave();
   }
 
-  rotateSelected() {
-    if (!this.selectedFurniture || this.mode !== 'architect') return;
+  rotateSelectedStep(step = 1) {
+    if (!this.selectedFurniture) return;
     if (!this.selectedFurniture.userData.rotatable) return;
-    this.selectedFurniture.rotation.y += Math.PI / 2;
+
+    this.selectedFurniture.rotation.y += step * Math.PI / 2;
     if (isWallGapType(this.selectedFurniture.userData.furnitureType)) {
       this.scene.refreshWallOpenings();
     }
-    this.scheduleSave();
+    if (this.mode === 'architect') {
+      this.scheduleSave();
+    } else {
+      this.persistCurrentApartment();
+      writeSave(this.savedData);
+    }
+  }
+
+  rotateSelected() {
+    if (this.mode !== 'architect') return;
+    this.rotateSelectedStep(1);
   }
 
   onKeyDown(e) {

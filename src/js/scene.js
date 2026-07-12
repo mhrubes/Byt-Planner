@@ -373,21 +373,25 @@ export class SceneManager {
         rotation: f.rotation.y,
       }));
 
+    const wallOpenings = openings.filter(
+      (opening) => findWallForDoor(opening, this.walls, FURNITURE_CATALOG, GRID_SIZE)
+    );
+
     const wallsToRender = applyDoorGaps(
       this.walls,
-      openings,
+      wallOpenings,
       FURNITURE_CATALOG,
       GRID_SIZE
     );
 
     for (const w of wallsToRender) {
-      const role = classifyDoorWallSegment(w, openings, FURNITURE_CATALOG, GRID_SIZE);
+      const role = classifyDoorWallSegment(w, wallOpenings, FURNITURE_CATALOG, GRID_SIZE);
       if (role === 'inside') continue;
       const mesh = this.createWallMesh(w, isPreview);
       if (mesh) this.wallsGroup.add(mesh);
     }
 
-    for (const opening of openings) {
+    for (const opening of wallOpenings) {
       if (opening.type === 'window') {
         const infills = this.createWindowWallInfills(opening, isPreview);
         infills.forEach((mesh) => this.wallsGroup.add(mesh));
@@ -450,17 +454,12 @@ export class SceneManager {
     if (lintelH < 0.04) return null;
 
     const parentWall = findWallForDoor(door, this.walls, FURNITURE_CATALOG, GRID_SIZE);
-    const colorSegment = parentWall ?? {
-      x1: door.x,
-      z1: door.z,
-      x2: door.x,
-      z2: door.z,
-    };
+    if (!parentWall) return null;
 
     const geo = new THREE.BoxGeometry(doorW, lintelH, WALL_THICKNESS);
     const mat = isPreview
       ? new THREE.MeshStandardMaterial({
-          color: this.resolveWallColor(colorSegment),
+          color: this.resolveWallColor(parentWall),
           roughness: 0.9,
           metalness: 0,
           emissive: 0x000000,
@@ -483,7 +482,7 @@ export class SceneManager {
     mesh.receiveShadow = isPreview;
     mesh.userData.isWall = true;
     mesh.userData.isDoorLintel = true;
-    mesh.userData.wallSegment = parentWall ? { ...parentWall } : { ...colorSegment };
+    mesh.userData.wallSegment = { ...parentWall };
 
     return mesh;
   }
@@ -499,12 +498,7 @@ export class SceneManager {
     const pz = opening.z * GRID_SIZE;
     const r = opening.rotation ?? 0;
     const parentWall = findWallForDoor(opening, this.walls, FURNITURE_CATALOG, GRID_SIZE);
-    const colorSegment = parentWall ?? {
-      x1: opening.x,
-      z1: opening.z,
-      x2: opening.x,
-      z2: opening.z,
-    };
+    if (!parentWall) return [];
 
     const meshes = [];
 
@@ -512,7 +506,7 @@ export class SceneManager {
       const geo = new THREE.BoxGeometry(winW, sill, WALL_THICKNESS);
       const mat = isPreview
         ? new THREE.MeshStandardMaterial({
-            color: this.resolveWallColor(colorSegment),
+            color: this.resolveWallColor(parentWall),
             roughness: 0.9,
             metalness: 0,
           })
@@ -527,7 +521,7 @@ export class SceneManager {
       sillMesh.castShadow = isPreview;
       sillMesh.receiveShadow = isPreview;
       sillMesh.userData.isWall = true;
-      sillMesh.userData.wallSegment = { ...colorSegment };
+      sillMesh.userData.wallSegment = { ...parentWall };
       meshes.push(sillMesh);
     }
 
@@ -537,7 +531,7 @@ export class SceneManager {
       const geo = new THREE.BoxGeometry(winW, lintelH, WALL_THICKNESS);
       const mat = isPreview
         ? new THREE.MeshStandardMaterial({
-            color: this.resolveWallColor(colorSegment),
+            color: this.resolveWallColor(parentWall),
             roughness: 0.9,
             metalness: 0,
           })
@@ -552,7 +546,7 @@ export class SceneManager {
       lintelMesh.castShadow = isPreview;
       lintelMesh.receiveShadow = isPreview;
       lintelMesh.userData.isWall = true;
-      lintelMesh.userData.wallSegment = { ...colorSegment };
+      lintelMesh.userData.wallSegment = { ...parentWall };
       meshes.push(lintelMesh);
     }
 
@@ -866,6 +860,17 @@ export class SceneManager {
     this.controls.update();
   }
 
+  projectWorldToContainer(worldPos) {
+    const vec = worldPos.clone().project(this.camera);
+    const w = this.container.clientWidth;
+    const h = this.container.clientHeight;
+    return {
+      x: (vec.x * 0.5 + 0.5) * w,
+      y: (-vec.y * 0.5 + 0.5) * h,
+      visible: vec.z < 1,
+    };
+  }
+
   onResize() {
     const w = this.container.clientWidth;
     const h = this.container.clientHeight;
@@ -878,6 +883,7 @@ export class SceneManager {
     requestAnimationFrame(this.animate);
     this.controls.update();
     this.renderer.render(this.scene, this.camera);
+    this.onAfterRender?.();
   }
 
   dispose() {
