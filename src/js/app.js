@@ -7,6 +7,7 @@ import {
   wallKey,
   carpetRectFromGrid,
   FURNITURE_GRID_SUBDIVISIONS,
+  FURNITURE_ROTATION_STEP,
   GRID_SIZE,
   getPlotLayout,
   shiftWallsToPlot,
@@ -160,7 +161,7 @@ export class BytPlannerApp {
 
           <div class="hint-box architect-only" id="architect-hints">
             <strong>Režim architekta</strong>
-            Klikni na nábytek a táhni. <kbd>R</kbd> otočí. <kbd>Del</kbd> smaže.<br />
+            Klikni na nábytek a táhni. <kbd>R</kbd> otočí o 45°. <kbd>Del</kbd> smaže.<br />
             Nábytek lze umístit na křižovatky mřížky, do středu čtverce i na půlku mezi čarami.<br />
             Nástroj Zeď: klikni start → konec (libovolný úhel).<br />
             Drž <kbd>Shift</kbd> pro úhly po 45°. Modrá čára = stávající byt.
@@ -875,7 +876,7 @@ export class BytPlannerApp {
       this.architectHints.innerHTML = `
         <strong>Režim architekta</strong>
         V katalogu vyber položku → na podlaze drž a táhni myší.<br />
-        Vybraný nábytek táhni myší. <kbd>R</kbd> otočí. <kbd>Del</kbd> smaže.<br />
+        Vybraný nábytek táhni myší. <kbd>R</kbd> otočí o 45°. <kbd>Del</kbd> smaže.<br />
         <kbd>Ctrl+C</kbd> kopíruje · <kbd>Ctrl+V</kbd> vloží kopii k přesunu.<br />
         U dveří: <kbd>O</kbd> otevře/zavře průchod ve zdi.<br />
         Nástroj Zeď: klikni start → konec (libovolný úhel). <kbd>Shift</kbd> = 45°.<br />
@@ -1752,7 +1753,7 @@ export class BytPlannerApp {
     if (!this.selectedFurniture) return;
     if (!this.selectedFurniture.userData.rotatable) return;
 
-    this.selectedFurniture.rotation.y += step * Math.PI / 2;
+    this.selectedFurniture.rotation.y += step * FURNITURE_ROTATION_STEP;
     if (isWallGapType(this.selectedFurniture.userData.furnitureType)) {
       this.scene.refreshWallOpenings();
     }
@@ -1765,7 +1766,8 @@ export class BytPlannerApp {
   }
 
   rotateSelected() {
-    if (this.mode !== 'architect') return;
+    if (!this.selectedFurniture) return;
+    if (this.mode !== 'architect' && this.mode !== 'preview') return;
     this.rotateSelectedStep(1);
   }
 

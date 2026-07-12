@@ -2,6 +2,8 @@
 export const GRID_SIZE = 1;
 /** Jemnější krok pro nábytek — polovina buňky / střed čtverce */
 export const FURNITURE_GRID_SUBDIVISIONS = 2;
+/** Krok otočení nábytku v radiánech (45°) */
+export const FURNITURE_ROTATION_STEP = Math.PI / 4;
 export const WALL_HEIGHT = 2.7;
 export const WALL_THICKNESS = 0.12;
 
